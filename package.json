@@ -1,0 +1,25 @@
+{
+  "name": "daniis-typescript-utils",
+  "version": "1.0.0",
+  "description": "This place is very new.\r This file will be populated in a moment...",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "do": "node scripts/gulpJsonCompressed.js run ./../"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Daniihh/daniis-typescript-utils.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Daniihh/daniis-typescript-utils/issues"
+  },
+  "homepage": "https://github.com/Daniihh/daniis-typescript-utils#readme",
+  "dependencies": {
+    "gulp": "^4.0.2",
+    "gulp-typescript": "^6.0.0-alpha.1",
+    "typescript": "^3.7.2"
+  }
+}

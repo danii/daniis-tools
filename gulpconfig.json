@@ -1,0 +1,20 @@
+{
+  "default": {
+    "source": "typescript/*.ts",
+    "actions": [
+      {
+        "action": "gulp-typescript",
+        "arguments": [
+          {
+            "target": "es6",
+            "lib": ["esnext", "es2017.object", "esnext.array"],
+            "module": "commonjs",
+            "esModuleInterop": true,
+            "experimentalDecorators": true
+          }
+        ],
+        "destination": "javascript/"
+      }
+    ]
+  }
+}

@@ -1,9 +1,0 @@
-//To be deleted
-
-{
-  "compilerOptions": {
-    "target": "es2018",
-    "esModuleInterop": true,
-    "lib": ["es2019", "dom"]
-  }
-}
