@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "lib": ["esnext", "es2017.object", "esnext.array"],
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "experimentalDecorators": true
+  }
+}
