@@ -482,8 +482,8 @@ defineProperties(String.prototype, {
       let str = this.substring(from, val ? val.index : this.length);
       if (str) push(str);
       if (val) {
-        let pos = findPairs(this, {"{": num => ++num, "}": num => ++num});
-        let code = this.substring(val.index + 2, pos);
+        let pos = findPairs(this, {"{": num => ++num, "}": num => --num});
+        let code = this.substring(val.index + 2, pos - 1);
         if (code) push(code, true);
         from = pos + 1;
       }
@@ -595,21 +595,20 @@ function findPairs(this: string | void, stringOrOperators: string | string[] |
     depthArg?: number) {
   const [string, operators, location, depth] =
     stringOrOperators instanceof Array || typeof stringOrOperators == "string" ||
-    stringOrOperators instanceof String ?
-      [
-        typeof stringOrOperators == "string" ?
-          stringOrOperators.split("") : stringOrOperators as string[],
-        operatorsOrLocation as Of<(depth: number) => number>,
-        locationOrDepth as number || 0,
-        depthArg == null ? -1 : depthArg as number
-      ] :
-      [
-        (this as string).split(""),
-        stringOrOperators as Of<(depth: number) => number>,
-        operatorsOrLocation as number || 0,
-        locationOrDepth == null ? -1 : locationOrDepth as number
-      ];
+    stringOrOperators instanceof String ? [
+      typeof stringOrOperators == "string" ?
+        stringOrOperators.split("") : stringOrOperators as string[],
+      operatorsOrLocation as Of<(depth: number) => number>,
+      locationOrDepth as number || 0,
+      depthArg == null ? -1 : depthArg as number
+    ] : [
+      (this as string).split(""),
+      stringOrOperators as Of<(depth: number) => number>,
+      operatorsOrLocation as number || 0,
+      locationOrDepth == null ? -1 : locationOrDepth as number
+    ];
   if (depth == 0) return location;
+  if (string[location] == null) throw new Error();
   const operation = operators[string[location]];
   const newDepth = operation ? operation(depth == -1 ? 0 : depth) : depth;
   return findPairs(string, operators, location + 1, newDepth);

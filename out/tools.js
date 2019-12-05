@@ -156,8 +156,8 @@ defineProperties(String.prototype, {
             if (str)
                 push(str);
             if (val) {
-                let pos = findPairs(this, { "{": num => ++num, "}": num => ++num });
-                let code = this.substring(val.index + 2, pos);
+                let pos = findPairs(this, { "{": num => ++num, "}": num => --num });
+                let code = this.substring(val.index + 2, pos - 1);
                 if (code)
                     push(code, true);
                 from = pos + 1;
@@ -257,22 +257,22 @@ function evaluate(code, args = {}) {
 }
 function findPairs(stringOrOperators, operatorsOrLocation, locationOrDepth, depthArg) {
     const [string, operators, location, depth] = stringOrOperators instanceof Array || typeof stringOrOperators == "string" ||
-        stringOrOperators instanceof String ?
-        [
-            typeof stringOrOperators == "string" ?
-                stringOrOperators.split("") : stringOrOperators,
-            operatorsOrLocation,
-            locationOrDepth || 0,
-            depthArg == null ? -1 : depthArg
-        ] :
-        [
-            this.split(""),
-            stringOrOperators,
-            operatorsOrLocation || 0,
-            locationOrDepth == null ? -1 : locationOrDepth
-        ];
+        stringOrOperators instanceof String ? [
+        typeof stringOrOperators == "string" ?
+            stringOrOperators.split("") : stringOrOperators,
+        operatorsOrLocation,
+        locationOrDepth || 0,
+        depthArg == null ? -1 : depthArg
+    ] : [
+        this.split(""),
+        stringOrOperators,
+        operatorsOrLocation || 0,
+        locationOrDepth == null ? -1 : locationOrDepth
+    ];
     if (depth == 0)
         return location;
+    if (string[location] == null)
+        throw new Error();
     const operation = operators[string[location]];
     const newDepth = operation ? operation(depth == -1 ? 0 : depth) : depth;
     return findPairs(string, operators, location + 1, newDepth);
