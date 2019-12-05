@@ -197,17 +197,16 @@ export type Constructor<T> =
 
 /**
  * A stack frame object.
- * 
- * Exclusion Reason: Relies on AdvancedError. May also be
- *   changed to an interface?
  */
-/*type StackFrame = {
-  file: string,
-  methodName: string,
-  arguments: string[],
-  lineNumber: number,
-  column: number
-};*/
+type StackFrame = {
+  name?: string,
+  file?: string,
+  isConstructor?: boolean,
+  isNative?: boolean,
+  evaluater?: StackFrame,
+  line?: number,
+  column?: number
+}
 
 
 
@@ -614,3 +613,113 @@ function findPairs(this: string | void, stringOrOperators: string | string[] |
   const newDepth = operation ? operation(depth == -1 ? 0 : depth) : depth;
   return findPairs(string, operators, location + 1, newDepth);
 }
+
+
+
+/*
+   CCCC L      AAA   SSSS  SSSS EEEEE  SSSS
+  C     L     A   A S     S     E     S    
+  C     L     AAAAA  SSS   SSS  EEE    SSS 
+  C     L     A   A     S     S E         S
+   CCCC LLLLL A   A SSSS  SSSS  EEEEE SSSS 
+*/
+
+export class Exception extends Error {
+  private static nodeError = /^(.*?)(?:: (.*?))?\n([\w\W]*)$/;
+  private static nodeStackFrame = /^\s*at\s+(.+?)(?:\s+\((.+?)\))?$/; //match 1: nodeFileDescriptor | functionName: string, match 2: nodeFileDescriptor | nodeEvalDescriptor | null
+  private static nodeFileDescriptor = /^(\S*?):(\d+):(\d+)$/; //match 1: fileName: string, match 2: line: number, match 3: column: number
+  private static nodeEvalDescriptor = /^eval\s+at\s+(.*?)\s+\((.*?)\)(?:, (.*?))?$/; //match 1: evaluateeFunc: string, match 2: nodeFileDescriptor | nodeEvalDescriptor, match 3: nodeFileDescriptor | null
+
+  public static parseError(error: Error) {
+    return this.parseNodeError(error.stack);
+  }
+
+  @bound
+  private static parseNodeError(error: string): {name: string, message?: string,
+      stack: StackFrame[]} {
+    let output: Partial<{name: string, message?: string, stack: StackFrame[]}> = {};
+    let stackMatch = error.match(this.nodeError);
+    output.name = stackMatch[1];
+    output.message = stackMatch[2];
+    output.stack = stackMatch[3].split("\n").map(this.parseNodeStackFrame);
+    return output as {name: string, message?: string, stack: StackFrame[]};
+  }
+
+  @bound
+  private static parseNodeStackFrame(frame: string) {
+    let output: Partial<StackFrame> = {};
+    let stackFrameMatch = frame.match(this.nodeStackFrame);
+    let stackFileMatch: RegExpMatchArray;
+    console.log(frame);
+    if (stackFrameMatch[2] == null) {
+      stackFileMatch = stackFrameMatch[1].match(this.nodeFileDescriptor);
+    } else {
+      output.name = stackFrameMatch[1];
+      if (output.name.startsWith("new ")) {
+        output.name = output.name.substr(4);
+        output.isConstructor = true;
+      }
+      stackFileMatch = stackFrameMatch[2].match(this.nodeFileDescriptor);
+      if (!stackFileMatch) {
+        let stackEvalMatch = stackFrameMatch[2].match(this.nodeEvalDescriptor);
+        if (stackEvalMatch)
+          return this.parseNodeEvalDescriptor(output.name, stackFrameMatch[2]);
+      }
+    }
+    if (stackFileMatch) {
+      output.file = stackFileMatch[1];
+      output.line = parseInt(stackFileMatch[2]);
+      output.column = parseInt(stackFileMatch[3]);
+    } else output.isNative = true;
+    return output as StackFrame;
+  }
+
+  @bound
+  private static parseNodeEvalDescriptor(evaluateeName: string,
+      evalDescriptor: string) {
+    let output: Partial<StackFrame> = {"name": evaluateeName, "evaluater": {}};
+    let stackEvalMatch = evalDescriptor.match(this.nodeEvalDescriptor);
+    let stackEvalMatch2 = stackEvalMatch[2].match(this.nodeEvalDescriptor);
+    if (stackEvalMatch2) {
+      output.evaluater =
+        this.parseNodeEvalDescriptor(stackEvalMatch[1], stackEvalMatch[2]);
+    } else {
+      output.evaluater.name = stackEvalMatch[1];
+      if (output.evaluater.name.startsWith("new ")) {
+        output.evaluater.name = output.evaluater.name.substr(4);
+        output.evaluater.isConstructor = true;
+      }
+      let stackFileMatch = stackEvalMatch[2].match(this.nodeFileDescriptor);
+      output.evaluater.file = stackFileMatch[1];
+      output.evaluater.line = parseInt(stackFileMatch[2]);
+      output.evaluater.column = parseInt(stackFileMatch[3]);
+    }
+    if (stackEvalMatch[3]) {
+      let stackFileMatch = stackEvalMatch[3].match(this.nodeFileDescriptor);
+      output.file = stackFileMatch[1];
+      output.line = parseInt(stackFileMatch[2]);
+      output.column = parseInt(stackFileMatch[3]);
+    }
+    return output;
+  }
+
+  public static getStack() {
+    return new Exception().stackModel;
+  }
+
+  public readonly stackModel: StackFrame[];
+
+  public constructor(message?: string) {
+    super(message);
+
+    this.name = this.constructor.name;
+
+    try {
+      this.stackModel = Exception.parseError(this).stack;
+    } catch (ex) {
+      this.stackModel = undefined;
+    }
+  }
+}
+
+Error.stackTraceLimit = Infinity;

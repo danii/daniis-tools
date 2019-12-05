@@ -6,20 +6,13 @@
  * Licensed under the GNU General Public License Version 3.
  * https://www.gnu.org/licenses/gpl-3.0.txt
  */
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-/**
- * A stack frame object.
- *
- * Exclusion Reason: Relies on AdvancedError. May also be
- *   changed to an interface?
- */
-/*type StackFrame = {
-  file: string,
-  methodName: string,
-  arguments: string[],
-  lineNumber: number,
-  column: number
-};*/
 /*
    AAA  DDDD  DDDD  IIIII TTTTT IIIII  OOO  N   N  SSSS
   A   A D   D D   D   I     T     I   O   O NN  N S
@@ -276,4 +269,114 @@ function findPairs(stringOrOperators, operatorsOrLocation, locationOrDepth, dept
     const operation = operators[string[location]];
     const newDepth = operation ? operation(depth == -1 ? 0 : depth) : depth;
     return findPairs(string, operators, location + 1, newDepth);
+}
+/*
+   CCCC L      AAA   SSSS  SSSS EEEEE  SSSS
+  C     L     A   A S     S     E     S
+  C     L     AAAAA  SSS   SSS  EEE    SSS
+  C     L     A   A     S     S E         S
+   CCCC LLLLL A   A SSSS  SSSS  EEEEE SSSS
+*/
+class Exception extends Error {
+    constructor(message) {
+        super(message);
+        this.name = this.constructor.name;
+        try {
+            this.stackModel = Exception.parseError(this).stack;
+        }
+        catch (ex) {
+            this.stackModel = undefined;
+        }
+    }
+    static parseError(error) {
+        return this.parseNodeError(error.stack);
+    }
+    static parseNodeError(error) {
+        let output = {};
+        let stackMatch = error.match(this.nodeError);
+        output.name = stackMatch[1];
+        output.message = stackMatch[2];
+        output.stack = stackMatch[3].split("\n").map(this.parseNodeStackFrame);
+        return output;
+    }
+    static parseNodeStackFrame(frame) {
+        let output = {};
+        let stackFrameMatch = frame.match(this.nodeStackFrame);
+        let stackFileMatch;
+        console.log(frame);
+        if (stackFrameMatch[2] == null) {
+            stackFileMatch = stackFrameMatch[1].match(this.nodeFileDescriptor);
+        }
+        else {
+            output.name = stackFrameMatch[1];
+            if (output.name.startsWith("new ")) {
+                output.name = output.name.substr(4);
+                output.isConstructor = true;
+            }
+            stackFileMatch = stackFrameMatch[2].match(this.nodeFileDescriptor);
+            if (!stackFileMatch) {
+                let stackEvalMatch = stackFrameMatch[2].match(this.nodeEvalDescriptor);
+                if (stackEvalMatch)
+                    return this.parseNodeEvalDescriptor(output.name, stackFrameMatch[2]);
+            }
+        }
+        if (stackFileMatch) {
+            output.file = stackFileMatch[1];
+            output.line = parseInt(stackFileMatch[2]);
+            output.column = parseInt(stackFileMatch[3]);
+        }
+        else
+            output.isNative = true;
+        return output;
+    }
+    static parseNodeEvalDescriptor(evaluateeName, evalDescriptor) {
+        let output = { "name": evaluateeName, "evaluater": {} };
+        let stackEvalMatch = evalDescriptor.match(this.nodeEvalDescriptor);
+        let stackEvalMatch2 = stackEvalMatch[2].match(this.nodeEvalDescriptor);
+        if (stackEvalMatch2) {
+            output.evaluater =
+                this.parseNodeEvalDescriptor(stackEvalMatch[1], stackEvalMatch[2]);
+        }
+        else {
+            output.evaluater.name = stackEvalMatch[1];
+            if (output.evaluater.name.startsWith("new ")) {
+                output.evaluater.name = output.evaluater.name.substr(4);
+                output.evaluater.isConstructor = true;
+            }
+            let stackFileMatch = stackEvalMatch[2].match(this.nodeFileDescriptor);
+            output.evaluater.file = stackFileMatch[1];
+            output.evaluater.line = parseInt(stackFileMatch[2]);
+            output.evaluater.column = parseInt(stackFileMatch[3]);
+        }
+        if (stackEvalMatch[3]) {
+            let stackFileMatch = stackEvalMatch[3].match(this.nodeFileDescriptor);
+            output.file = stackFileMatch[1];
+            output.line = parseInt(stackFileMatch[2]);
+            output.column = parseInt(stackFileMatch[3]);
+        }
+        return output;
+    }
+}
+Exception.nodeError = /^(.*?)(?:: (.*?))?\n([\w\W]*)$/;
+Exception.nodeStackFrame = /^\s*at\s+(.+?)(?:\s+\((.+?)\))?$/; //match 1: nodeFileDescriptor | functionName: string, match 2: nodeFileDescriptor | nodeEvalDescriptor | null
+Exception.nodeFileDescriptor = /^(\S*?):(\d+):(\d+)$/; //match 1: fileName: string, match 2: line: number, match 3: column: number
+Exception.nodeEvalDescriptor = /^eval\s+at\s+(.*?)\s+\((.*?)\)(?:, (.*?))?$/; //match 1: evaluateeFunc: string, match 2: nodeFileDescriptor | nodeEvalDescriptor, match 3: nodeFileDescriptor | null
+__decorate([
+    bound
+], Exception, "parseNodeError", null);
+__decorate([
+    bound
+], Exception, "parseNodeStackFrame", null);
+__decorate([
+    bound
+], Exception, "parseNodeEvalDescriptor", null);
+Error.stackTraceLimit = Infinity;
+try {
+    function MyThing() {
+        throw new Exception();
+    }
+    new MyThing();
+}
+catch (ex) {
+    console.log(ex.stackModel);
 }
