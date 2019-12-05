@@ -1,25 +1,9 @@
-/*
-  IIIII N   N FFFFF  OOO 
-    I   NN  N F     O   O
-    I   N N N FFF   O   O
-    I   N  NN F     O   O
-  IIIII N   N F      OOO 
-*/
-
-/*!
-
-*/
-
-/*
-  Danii's Tools
-  
-  This is a set of tools that I add to and use daily, it adds functionality to
-  objects and such that I feel should be implemented in Javascript.
-  
-  All content belongs to their rightful owners.
-  
-  
-  hi, i'm getting things cleaned up here.
+/**!
+ * Danii's Tools
+ * 
+ * Copyright (c) 2019 Daniel Conley
+ * Licensed under the GNU General Public License Version 3.
+ * https://www.gnu.org/licenses/gpl-3.0.txt
  */
 
 /*
@@ -54,7 +38,7 @@ type Setter = (v: any) => void;
  * Exclusion Reason: See
  *   [this pull request](https://github.com/microsoft/TypeScript/pull/26797).
  */
-type Entry<T> = Pair<Key, T>;
+type Entry<T> = Pair<string, T>;
 
 /**
  * Any type that can be used as an object key.
@@ -65,19 +49,27 @@ type Entry<T> = Pair<Key, T>;
 type Key = string | number | symbol;
 
 /**
- * A constructor function, such as a class.
+ * Represents any primitive value's prototype. Using
+ * `typeof` on primitive's prototypes reveal that they are
+ * objects and`instanceof` reveals that they are not
+ * instances of their constructor properties.
  * 
- * Exclusion Reason: Does not work 100%.
+ * Exclusion Reason: Exporting is not necessary at this point in time.
  */
-type Constructor<T> =
-  {new(): (...args: any[]) => T, prototype: Prototype<T>} & Function;
+type PsuedoObject<T extends Primitive> =
+  T extends string ? {[P in keyof string]: string[P]} & {constructor: Constructor<string>} :
+  T extends number ? {[P in keyof number]: number[P]} & {constructor: Constructor<number>} :
+  T extends bigint ? {[P in keyof bigint]: bigint[P]} & {constructor: Constructor<bigint>} :
+  T extends boolean ? {[P in keyof boolean]: boolean[P]} & {constructor: Constructor<boolean>} :
+  T extends symbol ? {[P in keyof symbol]: symbol[P]} & {constructor: Constructor<symbol>} :
+  {[P in keyof T]: T[P]} & {constructor: Constructor<T>};
 
 /**
- * A constructor's prototype property.
+ * A union of all JavaScript primitives.
  * 
- * Exclusion Reason: Does not work 100%.
+ * Exclusion Reason: Exporting is not necessary at this point in time.
  */
-type Prototype<T> = {constructor: Constructor<T>};
+type Primitive = string | number | bigint | boolean | symbol;
 
 /*
   Quick Definitions
@@ -197,18 +189,25 @@ export type Consumer<V, F = V[], T = any> = Mapper<V, void, F, T>;
 export type Timeout = ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>;
 
 /**
+ * A constructor function, such as a class.
+ */
+export type Constructor<T> =
+  {prototype: T, name?: string} &
+  T extends Primitive ? {(...args: any[]): T} : {new(...args: any[]): T};
+
+/**
  * A stack frame object.
  * 
  * Exclusion Reason: Relies on AdvancedError. May also be
  *   changed to an interface?
  */
-type StackFrame = {
+/*type StackFrame = {
   file: string,
   methodName: string,
   arguments: string[],
   lineNumber: number,
   column: number
-};
+};*/
 
 
 
@@ -328,8 +327,8 @@ declare global {
     */
     entries<T>(object: Of<T>): Entry<T>[];
     fromEntries<T>(entries: Entry<T>[]): Of<T>;
-    getPrototypeOf<T>(constructor: T): Prototype<T>;
-    getPrototypeOf(constructor: any): any;
+    getPrototypeOf<T extends Primitive>(instance: T): PsuedoObject<T>;
+    getPrototypeOf<T>(instance: T): T;
   }
 
   interface String {
@@ -337,7 +336,7 @@ declare global {
       New Functions
     */
     capitalize(): string;
-    escape(nonSpecials: boolean): string;
+    escape(nonSpecials?: boolean): string;
     toTitleCase(): string;
 
     /**
@@ -421,10 +420,12 @@ defineProperties(Array.prototype, {
 } as Partial<any[]>);
 
 defineProperties(Object, {
-  clone<T extends Object>(item: T): T {
+  clone<T>(item: T): T {
     if (typeof item != "object") return item;
 
-    let Construct: Constructor<T> = item.constructor as Constructor<T>;
+    let Construct = item.constructor as Constructor<T extends Primitive ? never : T>;
+    //@ts-ignore: Construct WILL always have a construct
+    //signature because we already handled all primitives.
     return Object.assign(new Construct(), item);
   },
 
@@ -445,7 +446,7 @@ defineProperties(Object, {
   },
 
   objectHasProperty(this: ObjectConstructor, object: any, property: Key) {
-    let protoChain: Prototype<Object>[] = [object];
+    let protoChain: Object[] = [object];
     while (this.getPrototypeOf(protoChain.last) !== null) protoChain.push(this.getPrototypeOf(protoChain.last));
     return protoChain.some((proto) => this.objectHasOwnProperty(proto, property));
   }
@@ -468,19 +469,28 @@ defineProperties(String.prototype, {
   },
 
   interpolate(this: string, values: Of<any>) {
-    let match: number;
-    let bldr = this.split("");
-    let vars = `let [${Object.keys(values)}] = [${Object.keys(values).map((key) => "values." + key)}]`;
-    while ((match = bldr.indexOf("$", ++match)) != -1) {
-      if (bldr[match++ - 1] == "\\" || bldr[match++] != "{") continue;
-      let bracks = 1;
-      let end = match;
-      while ((bldr[end] == "}" ? bracks-- : bldr[end] == "{" ? bracks++ : bracks) > 0) end++;
-      end--;
-      let code = bldr.slice(match--, end).join("");
-      bldr.splice(--match, end - --match, `${eval(`${vars}; (${code.escape(false)})`)}`);
-    }
-    return bldr.join("");
+    let from = 0;
+    let data: {content: string, type: "string" | "code"}[] = [];
+    let asString = (obj) =>
+      obj === null ? "null" : obj === undefined ? "undefined" :
+      typeof obj.toString == "function" ? obj.toString() :
+      Object.prototype.toString.call(obj);
+    let push = (content: string, code?: boolean) =>
+      data.push({content, "type": code ? "code" : "string"});
+    [...this.matchAll(/\\?\$/g), null].forEach(val => {
+      if (val && val[0].startsWith("\\")) return;
+      let str = this.substring(from, val ? val.index : this.length);
+      if (str) push(str);
+      if (val) {
+        let pos = findPairs(this, {"{": num => ++num, "}": num => ++num});
+        let code = this.substring(val.index + 2, pos);
+        if (code) push(code, true);
+        from = pos + 1;
+      }
+    });
+    return data.reduce((acc, val) => acc + (val.type == "code" ?
+      asString(evaluate(val.content, values)) :
+      val.content), "");
   }
 } as Partial<String>);
 
@@ -497,6 +507,8 @@ defineProperties(Symbol, {
   F     U   U N  NN C       T     I   O   O N  NN     S
   F      UUU  N   N  CCCC   T   IIIII  OOO  N   N SSSS 
 */
+
+const keywords = ["arguments", "in", "of", "for", "if", "else", "throw", "while", "do", "with", "function", "let", "const", "var", "new", "return", "delete"];
 
 /**
  * Ensures that the mentioned method's this value will
@@ -543,293 +555,62 @@ function withSelf(proto, key, descriptor) {
   return descriptor;
 }
 
+/**
+ * Works like the `eval` function, except it's evaluated
+ * within a function, so it's safer. You can set the name
+ * and values of the arguments to be used with the args
+ * object, and it'll return a value with or without a
+ * return statement in the provided code.
+ * 
+ * Exclusion reason: Uhhh it's new so yeah?
+ * 
+ * @param code The code to be executed.
+ * @param args The arguments to be used.
+ */
+function evaluate(code: string, args: Of<any> = {}) {
+  let specialArgNames = ["this"];
+  let specialArgs: Of<any> = {};
+  args = Object.filter(args, ([key, value]) => {
+    if (specialArgNames.includes(key)) {
+      specialArgs[key] = value;
+      return false;
+    } else if (keywords.includes(key)) {
+      throw new TypeError("Illegal argument name provided.");
+    } else return true;
+  });
 
-
-/*
-   CCCC L      AAA   SSSS  SSSS EEEEE  SSSS
-  C     L     A   A S     S     E     S    
-  C     L     AAAAA  SSS   SSS  EEE    SSS 
-  C     L     A   A     S     S E         S
-   CCCC LLLLL A   A SSSS  SSSS  EEEEE SSSS 
-*/
-
-//Exclusion Reason: Does not work 100%, copied code and possible name change.
-
-class AdvancedError extends Error {
-  private static readonly UNKNOWN_FUNCTION = '<unknown>';
-
-  /**
-   * Creates a class that extends this class.
-   * 
-   * @param name The name of the new class.
-   * @returns A class constructor function extending this class.
-   */
-  public static extend(name: string): typeof AdvancedError {
-    name = name.capitalize();
-    let {[name]: extended} = {[name]: class extends this {}};
-    return extended;
-  }
-
-  //!!! I DO NOT OWN THE STACK TRACE PARSERS BELOW. THESE WERE BRROWED FROM A STACK OVERFLOW POST.
-  public static stringifyStack(error: Error) {
-    if (!(error instanceof AdvancedError)) return error.stack;
-
-    let errors: Error[] = [error];
-    while (error instanceof AdvancedError && error.suppressed)
-        errors.push(error = error.suppressed);
-
-    let string = "";
-    let lastStack: StackFrame[];
-    errors.forEach((error, index) => {
-      let fullStack = error instanceof AdvancedError ?
-          error.stackMap :
-          (errors[index - 1] as AdvancedError).suppressedStackMap;
-
-      let usedStack = Object.clone(fullStack);
-      if (lastStack) {
-        let rLastStack = lastStack.softReverse();
-        let lcsf = usedStack.softReverse().find((frame, index) => {
-          let compare = rLastStack[index];
-          return !compare || frame.methodName != compare.methodName ||
-              frame.file != compare.file;
-        });
-        usedStack.splice(usedStack.indexOf(lcsf) + 2);
-      }
-      
-      string += (index != 0 ? "\nCaused by: " : "") + error.name;
-      if (error.message) string += ": " + error.message;
-      usedStack.forEach((stack) => {
-        string += "\n\tat " + stack.methodName + " (" + stack.file + ":" +
-            stack.lineNumber + ":" + stack.column + ")";
-      });
-      if (usedStack.length < fullStack.length)
-          string += "\n\t... " + (fullStack.length - usedStack.length) + " more";
-
-      lastStack = fullStack;
-    });
-    return string;
-  }
-
-  public static parseStack(stackString: string): StackFrame[] {
-    const lines = stackString.split('\n');
-
-    return lines.reduce((stack, line) => {
-      const parseResult =
-        AdvancedError.parseChrome(line) ||
-        AdvancedError.parseWinjs(line) ||
-        AdvancedError.parseGecko(line) ||
-        AdvancedError.parseNode(line) ||
-        AdvancedError.parseJSC(line);
-
-      if (parseResult) {
-        stack.push(parseResult);
-      }
-
-      return stack;
-    }, []);
-  }
-  
-  private static parseChrome(line: string): StackFrame {
-    const chromeRe = /^\s*at (.*?) ?\(((?:file|https?|blob|chrome-extension|native|eval|webpack|<anonymous>|\/).*?)(?::(\d+))?(?::(\d+))?\)?\s*$/i;
-    const chromeEvalRe = /\((\S*)(?::(\d+))(?::(\d+))\)/;
-
-    const parts = chromeRe.exec(line);
-
-    if (!parts) {
-      return null;
-    }
-
-    const isNative = parts[2] && parts[2].indexOf('native') === 0; // start of line
-    const isEval = parts[2] && parts[2].indexOf('eval') === 0; // start of line
-
-    const submatch = chromeEvalRe.exec(parts[2]);
-    if (isEval && submatch != null) {
-      // throw out eval line/column and use top-most line/column number
-      parts[2] = submatch[1]; // url
-      parts[3] = submatch[2]; // line
-      parts[4] = submatch[3]; // column
-    }
-
-    return {
-      file: !isNative ? parts[2] : null,
-      methodName: parts[1] || AdvancedError.UNKNOWN_FUNCTION,
-      arguments: isNative ? [parts[2]] : [],
-      lineNumber: parts[3] ? +parts[3] : null,
-      column: parts[4] ? +parts[4] : null,
-    };
-  }
-
-  
-  private static parseWinjs(line: string): StackFrame {
-    const winjsRe = /^\s*at (?:((?:\[object object\])?.+) )?\(?((?:file|ms-appx|https?|webpack|blob):.*?):(\d+)(?::(\d+))?\)?\s*$/i;
-
-    const parts = winjsRe.exec(line);
-
-    if (!parts) {
-      return null;
-    }
-
-    return {
-      file: parts[2],
-      methodName: parts[1] || AdvancedError.UNKNOWN_FUNCTION,
-      arguments: [],
-      lineNumber: +parts[3],
-      column: parts[4] ? +parts[4] : null,
-    };
-  }
-  
-  private static parseGecko(line: string): StackFrame {
-    const geckoRe = /^\s*(.*?)(?:\((.*?)\))?(?:^|@)((?:file|https?|blob|chrome|webpack|resource|\[native).*?|[^@]*bundle)(?::(\d+))?(?::(\d+))?\s*$/i;
-    const geckoEvalRe = /(\S+) line (\d+)(?: > eval line \d+)* > eval/i;
-  
-    const parts = geckoRe.exec(line);
-
-    if (!parts) {
-      return null;
-    }
-
-    const isEval = parts[3] && parts[3].indexOf(' > eval') > -1;
-
-    const submatch = geckoEvalRe.exec(parts[3]);
-    if (isEval && submatch != null) {
-      // throw out eval line/column and use top-most line number
-      parts[3] = submatch[1];
-      parts[4] = submatch[2];
-      parts[5] = null; // no column when eval
-    }
-
-    return {
-      file: parts[3],
-      methodName: parts[1] || AdvancedError.UNKNOWN_FUNCTION,
-      arguments: parts[2] ? parts[2].split(',') : [],
-      lineNumber: parts[4] ? +parts[4] : null,
-      column: parts[5] ? +parts[5] : null,
-    };
-  }
-
-  private static parseJSC(line: string): StackFrame {
-    const javaScriptCoreRe = /^\s*(?:([^@]*)(?:\((.*?)\))?@)?(\S.*?):(\d+)(?::(\d+))?\s*$/i;
-    
-    const parts = javaScriptCoreRe.exec(line);
-
-    if (!parts) {
-      return null;
-    }
-
-    return {
-      file: parts[3],
-      methodName: parts[1] || AdvancedError.UNKNOWN_FUNCTION,
-      arguments: [],
-      lineNumber: +parts[4],
-      column: parts[5] ? +parts[5] : null,
-    };
-  }
-
-  private static parseNode(line: string): StackFrame {
-    const nodeRe = /^\s*at (?:((?:\[object object\])?\S+(?: \[as \S+\])?) )?\(?(.*?):(\d+)(?::(\d+))?\)?\s*$/i;
-    
-    const parts = nodeRe.exec(line);
-
-    if (!parts) {
-      return null;
-    }
-
-    return {
-      file: parts[2],
-      methodName: parts[1] || AdvancedError.UNKNOWN_FUNCTION,
-      arguments: [],
-      lineNumber: +parts[3],
-      column: parts[4] ? +parts[4] : null,
-    };
-  }
-
-  public readonly stack: any;
-  public readonly message: any;
-  private displayedStack: string;
-  private readonly description: string;
-  private readonly stackMap: StackFrame[];
-
-  public readonly suppressed?: Error;
-  private suppressedStackMap?: StackFrame[];
-
-  public constructor(message?: string | Error, suppressed?: Error) {
-    if (message instanceof Error) [message, suppressed] = [undefined as string, message];
-    super();
-
-    // if (!(this instanceof arguments.callee)) {
-    //   let Construct = arguments.callee as Constructor<any>;
-    //   let thiz = Object.create(Construct.prototype);
-    //   eval("_this = thiz");
-
-    //   let protos: Constructor<any>[] = [];
-    //   let Proto = Construct;
-    //   while (Proto.name != "") {
-    //     Proto = Object.getPrototypeOf(Proto);
-    //     protos.unshift(Proto);
-    //   }
-    //   let reducer = (thiz: AdvancedError, proto) => {return proto.call(thiz), thiz;};
-    //   thiz = protos.reduce(reducer, this);
-    //   eval("_this = thiz");
-
-    //   let p = new Error();
-    //   this.stack = p.stack;
-    // }
-
-    this.description = message;
-    this.name = this.constructor.name;
-    this.stackMap = AdvancedError.parseStack(this.stack);
-    
-    if (suppressed) {
-      this.suppressed = suppressed;
-      if (!(suppressed instanceof AdvancedError)) {
-        this.suppressedStackMap = AdvancedError.parseStack(suppressed.stack);
-      }
-    }
-
-    let hidden = <C>(common: C) => {
-      return {
-        get(this: AdvancedError): string | C {
-          if (AdvancedError.parseStack(new Error().stack).length > 1) {
-            return common;
-          } else {
-            return this.displayedStack;
-          }
-        }
-      }
-    };
-    Object.defineProperties(this, {
-      "stack": hidden(this.stackMap),
-      "message": hidden(this.description)
-    });
-
-    this.displayedStack = AdvancedError.stringifyStack(this);
-  }
-
-  public toString() {
-    return this.displayedStack;
-  }
+  let argNames = args ? Object.keys(args) : [];
+  let argValues = args ? Object.values(args) : [];
+  let finalCode = `try{return eval("${code.escape()}")}catch(a){if(!(a ` +
+    'instanceof SyntaxError))throw a;let b=JSON.parse("' +
+    JSON.stringify(argNames).escape() + '");return new Function(...b,"' +
+    code.escape() + '")(...arguments)}';
+  let func = new Function(...argNames, finalCode);
+  return func.call(specialArgs.this ? specialArgs.this : this, ...argValues);
 }
 
-class ArbitraryDataError<Type> extends AdvancedError {
-  private readonly data: Type;
-
-  constructor(data: Type, message: string | Error, suppressed?: Error) {
-    super(message, suppressed);
-    this.data = data;
-  }
-
-  public getData() {
-    return this.data;
-  }
+function findPairs(this: string | void, stringOrOperators: string | string[] |
+    Of<(depth: number) => number>, operatorsOrLocation?: number |
+    Of<(depth: number) => number>, locationOrDepth?: number,
+    depthArg?: number) {
+  const [string, operators, location, depth] =
+    stringOrOperators instanceof Array || typeof stringOrOperators == "string" ||
+    stringOrOperators instanceof String ?
+      [
+        typeof stringOrOperators == "string" ?
+          stringOrOperators.split("") : stringOrOperators as string[],
+        operatorsOrLocation as Of<(depth: number) => number>,
+        locationOrDepth as number || 0,
+        depthArg == null ? -1 : depthArg as number
+      ] :
+      [
+        (this as string).split(""),
+        stringOrOperators as Of<(depth: number) => number>,
+        operatorsOrLocation as number || 0,
+        locationOrDepth == null ? -1 : locationOrDepth as number
+      ];
+  if (depth == 0) return location;
+  const operation = operators[string[location]];
+  const newDepth = operation ? operation(depth == -1 ? 0 : depth) : depth;
+  return findPairs(string, operators, location + 1, newDepth);
 }
-
-//Exclusion Reason: Not necessary??
-class StringBuilder extends Array<string> {
-  public join(glue?: string) {
-    return super.join(glue || "");
-  }
-}
-
-let AdvancedTypeError = AdvancedError.extend("AdvancedTypeError");
-let NullError = AdvancedTypeError.extend("NullError");
-let ArgumentsError = AdvancedError.extend("ArgumentsError");

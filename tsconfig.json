@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "es6",
-    "lib": ["esnext", "es2017.object", "esnext.array"],
+    "lib": ["esnext", "es2017.object", "esnext.array", "es2020.string"],
     "module": "commonjs",
     "esModuleInterop": true,
     "experimentalDecorators": true
