@@ -1,30 +1,31 @@
 {
   "name": "daniis-typescript-utils",
   "version": "1.0.0",
-  "description": "This place is very new.\r This file will be populated in a moment...",
+  "description": "Soon™ (Not a serious use of the TM emoji)",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "do": "node scripts/gulpJsonCompressed.js run ./../"
+    "test": "mocha",
+    "start": "gulp compile"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Daniihh/daniis-typescript-utils.git"
   },
-  "author": "",
+  "author": "Daniihh",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/Daniihh/daniis-typescript-utils/issues"
   },
   "homepage": "https://github.com/Daniihh/daniis-typescript-utils#readme",
-  "dependencies": {
-    "callsites": "^3.1.0",
-    "error-stack-parser": "^2.0.4",
-    "gulp": "^4.0.2",
-    "gulp-typescript": "^6.0.0-alpha.1",
-    "typescript": "^3.7.2"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "@types/node": "^12.12.14"
+    "@types/node": "^12.12.14",
+    "gulp": "^4.0.2",
+    "gulp-minify": "^3.1.0",
+    "gulp-rename": "^2.0.0",
+    "gulp-typescript": "^6.0.0-alpha.1",
+    "merge-stream": "^2.0.0",
+    "mocha": "^6.2.2",
+    "typescript": "^3.7.3"
   }
 }
