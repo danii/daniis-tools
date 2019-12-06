@@ -92,7 +92,7 @@ describe("Object", function() {
   describe(".getType()", function() {
     it('should return the input\'s typeof value if it is not typeof "object"', function() {
       let tests = ["Thinking up values for tests is hard.", 8764, Symbol("Another secret!")];
-      tests.forEach(test => assert.strictEqual(Object.getType(test), typeof type));
+      tests.forEach(test => assert.strictEqual(Object.getType(test), typeof test));
     });
 
     it("should return the inputs's contructor's name if it is typeof is \"object\"", function() {
@@ -115,7 +115,7 @@ describe("String", function() {
 
   describe("#toTitleCase()", function() {
     it("should convert the string to title case", function() {
-      assert.strictEqual("this is my video TITLE".toTitleCase(), "This is My Video Title");
+      assert.strictEqual("this is my video TITLE".toTitleCase(), "This Is My Video Title");
     });
   });
 
