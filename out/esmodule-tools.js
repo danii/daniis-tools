@@ -1,12 +1,10 @@
-"use strict";
-/**!
+/*!
  * Danii's Tools
  *
  * Copyright (c) 2019 Daniel Conley
  * Licensed under the GNU General Public License Version 3.
  * https://www.gnu.org/licenses/gpl-3.0.txt
  */
-Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * A stack frame object.
  *
@@ -187,7 +185,7 @@ const keywords = ["arguments", "in", "of", "for", "if", "else", "throw", "while"
  * @param key Name of the function.
  * @param descriptor Function's descriptor.
  */
-function bound(proto, key, descriptor) {
+export function bound(proto, key, descriptor) {
     if (proto.constructor == Object)
         descriptor = proto; //BABEL Fix
     let value = descriptor.value;
@@ -196,7 +194,6 @@ function bound(proto, key, descriptor) {
     descriptor.get = function () { return value.bind(this); };
     return descriptor;
 }
-exports.bound = bound;
 /**
  * Exclusion Reason:
  * This decorator currently doesn't work in TypeScript due

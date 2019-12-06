@@ -1,4 +1,4 @@
-/**!
+/*!
  * Danii's Tools
  * 
  * Copyright (c) 2019 Daniel Conley
