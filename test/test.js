@@ -115,7 +115,7 @@ describe("String", function() {
 
   describe("#toTitleCase()", function() {
     it("should convert the string to title case", function() {
-      assert.strictEqual("this is my video TITLE".toTitleCase(), "This is My Video Title");
+      assert.strictEqual("this is my video TITLE".toTitleCase(), "This Is My Video Title");
     });
   });
 
