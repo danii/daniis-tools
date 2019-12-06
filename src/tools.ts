@@ -438,6 +438,8 @@ defineProperties(Object, {
   },
 
   getType(item: any) {
+    if (item === null) return "null";
+    if (typeof item != "object") return typeof item;
     return Object.getPrototypeOf(item).constructor.name;
   },
 
@@ -457,7 +459,7 @@ defineProperties(String.prototype, {
     return this.substr(0, 1).toUpperCase() + this.substr(1);
   },
 
-  escape(nonSpecials: boolean = true) {
+  escape(nonSpecials: boolean = true) { //TODO: Improve me!
     let charArray = this.split("");
     if (nonSpecials) charArray = charArray.map((char) => ['"', "'", "\\"].includes(char) ? "\\" + char : char)
     charArray = charArray.map((char) => ["\n", "\r", "\t"].includes(char) ? "\\" + {"\n": "n", "\r": "r", "\t": "t"}[char] : char);
@@ -469,28 +471,9 @@ defineProperties(String.prototype, {
   },
 
   interpolate(this: string, values: Of<any>) {
-    let from = 0;
-    let data: {content: string, type: "string" | "code"}[] = [];
-    let asString = (obj) =>
-      obj === null ? "null" : obj === undefined ? "undefined" :
-      typeof obj.toString == "function" ? obj.toString() :
-      Object.prototype.toString.call(obj);
-    let push = (content: string, code?: boolean) =>
-      data.push({content, "type": code ? "code" : "string"});
-    [...this.matchAll(/\\?\$/g), null].forEach(val => {
-      if (val && val[0].startsWith("\\")) return;
-      let str = this.substring(from, val ? val.index : this.length);
-      if (str) push(str);
-      if (val) {
-        let pos = findPairs(this, {"{": num => ++num, "}": num => --num});
-        let code = this.substring(val.index + 2, pos - 1);
-        if (code) push(code, true);
-        from = pos + 1;
-      }
-    });
-    return data.reduce((acc, val) => acc + (val.type == "code" ?
-      asString(evaluate(val.content, values)) :
-      val.content), "");
+    let charArray = this.split("");
+    charArray = charArray.map(char => char == "`" ? "\`" : char == "\\" ? "\\\\" : char);
+    return evaluate("`" + charArray.join("") + "`", values);
   }
 } as Partial<String>);
 
@@ -520,8 +503,6 @@ const keywords = ["arguments", "in", "of", "for", "if", "else", "throw", "while"
  */
 export function bound<Type extends (...a: any[]) => any>(proto: Object,
     key: string, descriptor: TypedPropertyDescriptor<Type>) {
-  if (proto.constructor == Object) descriptor = proto; //BABEL Fix
-
   let value = descriptor.value;
   delete descriptor.writable;
   delete descriptor.value;
