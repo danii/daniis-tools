@@ -1,5 +1,7 @@
 const assert = require("assert");
+const util = require("util");
 const tools = require("./../out/commonjs-tools");
+const data = require("./testData.json");
 
 /**
  * Typescript's tired and true __decorate function.
@@ -11,10 +13,44 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
   return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 
+function assertSimilar(inputA, inputB, noThrow) {
+  if (typeof inputA != "object") {
+    if (inputA != inputB) {
+      if (noThrow) return false;
+      else throw new Error(`As primitives, ${inputA} != ${inputB}.`);
+    }
+    return noThrow ? true : undefined;
+  }
+
+  let [inputAEntries, inputBEntries] = [inputA, inputB].map(Object.entries);
+  let differences = {};
+
+  inputAEntries.forEach(a => {
+    let b = inputBEntries.find(b => b[0] == a[0]) || [a[0], undefined];
+    let isSimilar = assertSimilar(a[1], b[1], true);
+    if (typeof isSimilar == "boolean" ? !isSimilar : true)
+      if (typeof isSimilar == "object")
+        differences[a[0]] = isSimilar;
+      else
+        differences[a[0]] = [a[1], b[1]];
+  });
+
+  if (Object.keys(differences).length > 0)
+    if (noThrow) return differences;
+    else {
+      console.log(util.inspect(differences, true, 100));
+      let check = c => !(c instanceof Array) ?
+        Object.entries(c).map(check).join("\n") : c[1] instanceof Array ?
+          `"${c[0]}": ${util.inspect(c[1][0])} != ${util.inspect(c[1][1])}` :
+          Object.entries(c[1]).map(check).join("\n");
+      let diffs = check(differences);
+      throw new Error(`${diffs.split("\n").length} differences found.\n\n${diffs}`);
+    }
+  return noThrow ? true : undefined;
+}
+
 function assertSimilarButNotSame(inputA, inputB) {
-  assert(Object.entries(inputA).every(entryA =>
-    Object.entries(inputB).find(entryB =>
-      entryA[0] == entryB[0] && entryA[1] == entryB[1])));
+  assertSimilar(inputA, inputB);
   assert(inputA != inputB);
 }
 
@@ -144,5 +180,24 @@ describe("bound", function() {
     __decorate([tools.bound], object, "func", null);
 
     assert.strictEqual(object.func.call({}), object);
+  });
+});
+
+describe("Exception", function() {
+  describe(".parseError", function() {
+    it("should be able to parse a stack from a V8 environment", function() {
+      let stack = data.errors.v8.join("\n");
+      assertSimilar(tools.Exception.parseError(stack), data.errors.expected);
+    });
+
+    it("should be able to parse a stack from a SpiderMonkey environment", function() {
+      let stack = data.errors.spiderMonkey.join("\n");
+      assertSimilar(tools.Exception.parseError(stack), data.errors.expected);
+    });
+
+    it("should be able to parse a stack from a Chakra environment", function() {
+      let stack = data.errors.chakra.join("\n");
+      assertSimilar(tools.Exception.parseError(stack), data.errors.expected);
+    });
   });
 });

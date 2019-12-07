@@ -428,12 +428,12 @@ defineProperties(Object, {
     return Object.assign(new Construct(), item);
   },
 
-  every<Type, Values, This = any>(this: ObjectConstructor, object: Of<Values> & Type, callback: Mapper<Entry<Values>, boolean, Type, This>, thisArg?: This): boolean {
-    return this.entries(object).every((a, i) => callback.call(thisArg, a, i, object));
+  every<Type, Values, This = any>(object: Of<Values> & Type, callback: Mapper<Entry<Values>, boolean, Type, This>, thisArg?: This): boolean {
+    return Object.entries(object).every((a, i) => callback.call(thisArg, a, i, object));
   },
 
-  filter<Type, Values, This = any>(this: ObjectConstructor, object: Of<Values> & Type, callback: Mapper<Entry<Values>, boolean, Type, This>, thisArg?: This): Of<Values> {
-    return this.fromEntries(this.entries(object).filter((a, i) => callback.call(thisArg, a, i, object)));
+  filter<Type, Values, This = any>(object: Of<Values> & Type, callback: Mapper<Entry<Values>, boolean, Type, This>, thisArg?: This): Of<Values> {
+    return Object.fromEntries(Object.entries(object).filter((a, i) => callback.call(thisArg, a, i, object)));
   },
 
   getType(item: any) {
@@ -446,10 +446,10 @@ defineProperties(Object, {
     return [].hasOwnProperty.call(object, property);
   },
 
-  objectHasProperty(this: ObjectConstructor, object: any, property: Key) {
+  objectHasProperty(object: any, property: Key) {
     let protoChain: Object[] = [object];
-    while (this.getPrototypeOf(protoChain.last) !== null) protoChain.push(this.getPrototypeOf(protoChain.last));
-    return protoChain.some((proto) => this.objectHasOwnProperty(proto, property));
+    while (Object.getPrototypeOf(protoChain.last) !== null) protoChain.push(Object.getPrototypeOf(protoChain.last));
+    return protoChain.some((proto) => Object.objectHasOwnProperty(proto, property));
   }
 });
 
@@ -604,54 +604,77 @@ function findPairs(this: string | void, stringOrOperators: string | string[] |
    CCCC LLLLL A   A SSSS  SSSS  EEEEE SSSS 
 */
 
+class ExceptionParserError extends SyntaxError {
+  public readonly suppressed: any;
+
+  constructor(suppressed?: any, frame?: number) {
+    super("Failed to parse stack" + (frame != null ? ` frame #${frame}.` : frame != 0 ? " frame." : "."));
+    this.suppressed = suppressed;
+  }
+}
+
 export class Exception extends Error {
+  private static fixCode = 'try{var a=new Error;a=a.stack.startsWith(a.name)?1:0,_this.__proto__=this.constructor.prototype;var b=_this.stack.split("\\n");b.splice(a,1),_this.stack=b.join("\\n")}catch(a){}';
+
   private static nodeError = /^(.*?)(?:: (.*?))?\n([\w\W]*)$/;
   private static nodeStackFrame = /^\s*at\s+(.+?)(?:\s+\((.+?)\))?$/; //match 1: nodeFileDescriptor | functionName: string, match 2: nodeFileDescriptor | nodeEvalDescriptor | null
-  private static nodeFileDescriptor = /^(\S*?):(\d+):(\d+)$/; //match 1: fileName: string, match 2: line: number, match 3: column: number
+  private static nodeFileDescriptor = /^(\S*?):(\d+)(?::(\d+))?$/; //match 1: fileName: string, match 2: line: number, match 3: column: number
   private static nodeEvalDescriptor = /^eval\s+at\s+(.*?)\s+\((.*?)\)(?:, (.*?))?$/; //match 1: evaluateeFunc: string, match 2: nodeFileDescriptor | nodeEvalDescriptor, match 3: nodeFileDescriptor | null
 
-  public static parseError(error: Error) {
-    return this.parseNodeError(error.stack);
+  public static parseError(error: Error | string) {
+    error = error instanceof Error ? error.stack : error;
+    return this.parseNodeError(error);
   }
 
   @bound
   private static parseNodeError(error: string): {name: string, message?: string,
       stack: StackFrame[]} {
-    let output: Partial<{name: string, message?: string, stack: StackFrame[]}> = {};
-    let stackMatch = error.match(this.nodeError);
-    output.name = stackMatch[1];
-    output.message = stackMatch[2];
-    output.stack = stackMatch[3].split("\n").map(this.parseNodeStackFrame);
-    return output as {name: string, message?: string, stack: StackFrame[]};
+    try {
+      let output: Partial<{name: string, message?: string, stack: StackFrame[]}> = {};
+      let stackMatch = error.match(this.nodeError);
+      output.name = stackMatch[1];
+      output.message = stackMatch[2];
+      output.stack = stackMatch[3].split("\n").map(this.parseNodeStackFrame);
+      return output as {name: string, message?: string, stack: StackFrame[]};
+    } catch (error) {
+      if (error instanceof ExceptionParserError) throw error;
+      throw new ExceptionParserError(error);
+    }
   }
 
   @bound
-  private static parseNodeStackFrame(frame: string) {
-    let output: Partial<StackFrame> = {};
-    let stackFrameMatch = frame.match(this.nodeStackFrame);
-    let stackFileMatch: RegExpMatchArray;
-    console.log(frame);
-    if (stackFrameMatch[2] == null) {
-      stackFileMatch = stackFrameMatch[1].match(this.nodeFileDescriptor);
-    } else {
-      output.name = stackFrameMatch[1];
-      if (output.name.startsWith("new ")) {
-        output.name = output.name.substr(4);
-        output.isConstructor = true;
+  private static parseNodeStackFrame(frame: string, number?: number) {
+    try {
+      let output: Partial<StackFrame> = {};
+      let stackFrameMatch = frame.match(this.nodeStackFrame);
+      let stackFileMatch: RegExpMatchArray;
+      if (stackFrameMatch[2] == null) {
+        stackFileMatch = stackFrameMatch[1].match(this.nodeFileDescriptor);
+      } else {
+        output.name = stackFrameMatch[1];
+        if (output.name.startsWith("new ")) {
+          output.name = output.name.substr(4);
+          output.isConstructor = true;
+        }
+        stackFileMatch = stackFrameMatch[2].match(this.nodeFileDescriptor);
+        if (!stackFileMatch) {
+          let stackEvalMatch = stackFrameMatch[2].match(this.nodeEvalDescriptor);
+          if (stackEvalMatch)
+            return this.parseNodeEvalDescriptor(output.name, stackFrameMatch[2]);
+        }
       }
-      stackFileMatch = stackFrameMatch[2].match(this.nodeFileDescriptor);
-      if (!stackFileMatch) {
-        let stackEvalMatch = stackFrameMatch[2].match(this.nodeEvalDescriptor);
-        if (stackEvalMatch)
-          return this.parseNodeEvalDescriptor(output.name, stackFrameMatch[2]);
-      }
+      if (stackFileMatch) {
+        output.file = stackFileMatch[1] == "<anonymous>" ?
+          undefined : stackFileMatch[1];
+        output.line = parseInt(stackFileMatch[2]);
+        output.column = stackFileMatch[3] == undefined ?
+          undefined : parseInt(stackFileMatch[3]);
+      } else output.isNative = true;
+      return output as StackFrame;
+    } catch (error) {
+      if (error instanceof ExceptionParserError) throw error;
+      throw new ExceptionParserError(error, number + 1 || 0);
     }
-    if (stackFileMatch) {
-      output.file = stackFileMatch[1];
-      output.line = parseInt(stackFileMatch[2]);
-      output.column = parseInt(stackFileMatch[3]);
-    } else output.isNative = true;
-    return output as StackFrame;
   }
 
   @bound
@@ -670,15 +693,19 @@ export class Exception extends Error {
         output.evaluater.isConstructor = true;
       }
       let stackFileMatch = stackEvalMatch[2].match(this.nodeFileDescriptor);
-      output.evaluater.file = stackFileMatch[1];
+      output.evaluater.file = stackFileMatch[1] == "<anonymous>" ?
+        undefined : stackFileMatch[1];
       output.evaluater.line = parseInt(stackFileMatch[2]);
-      output.evaluater.column = parseInt(stackFileMatch[3]);
+      output.evaluater.column = stackFileMatch[3] == undefined ?
+        undefined : parseInt(stackFileMatch[3]);
     }
     if (stackEvalMatch[3]) {
       let stackFileMatch = stackEvalMatch[3].match(this.nodeFileDescriptor);
-      output.file = stackFileMatch[1];
+      output.file = stackFileMatch[1] == "<anonymous>" ?
+        undefined : stackFileMatch[1];
       output.line = parseInt(stackFileMatch[2]);
-      output.column = parseInt(stackFileMatch[3]);
+      output.column = stackFileMatch[3] == undefined ?
+        undefined : parseInt(stackFileMatch[3]);
     }
     return output;
   }
@@ -687,17 +714,40 @@ export class Exception extends Error {
     return new Exception().stackModel;
   }
 
+  public static isSupported() {
+    try {
+      Exception.parseError(new Error().stack);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public readonly stackModel: StackFrame[];
 
   public constructor(message?: string) {
     super(message);
+    eval(Exception.fixCode);
 
     this.name = this.constructor.name;
 
     try {
       this.stackModel = Exception.parseError(this).stack;
-    } catch (ex) {
+    } catch (err) {
       this.stackModel = undefined;
+      let errors = [err];
+      while (errors.last.suppressed) errors.push(errors.last.suppressed);
+      errors.map(error => error.stack && error.stack.endsWith("\n") ?
+        [error, "\n"] : error).flat();
+      let args = [
+        `A stack trace model was unable to be produced for the Exception "%c${
+          this.message ? this.message : "No message set"}%c". The error that ` +
+          "caused this alongside the stack trace of the Exception are " +
+          "provided below.\n",
+        `font-style: italic; color: ${this.message ? "cyan" : "#004dff"}`, "",
+        ...errors, this
+      ];
+      (console.error ? console.error : console.log)(...args);
     }
   }
 }

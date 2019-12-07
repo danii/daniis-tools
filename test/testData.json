@@ -1,0 +1,84 @@
+{
+  "errors": {
+    "expected": {
+      "name": "Error",
+      "message": "Example V8 Error",
+      "stack": [
+        {
+          "name": "eval",
+          "line": 1,
+          "column": 7,
+          "evaluater": {
+            "name": "doubleEvalFunction",
+            "evaluater": {
+              "name": "namedArrowFunction",
+              "line": 3,
+              "file": "errorScript.js"
+            }
+          }
+        },
+        {
+          "name": "doubleEvalFunction",
+          "line": 2,
+          "column": 3,
+          "evaluater": {
+            "name": "namedArrowFunction",
+            "line": 3,
+            "file": "errorScript.js"
+          }
+        },
+        {
+          "name": "eval",
+          "line": 5,
+          "column": 1,
+          "evaluater": {
+            "name": "namedArrowFunction",
+            "line": 3,
+            "file": "errorScript.js"
+          }
+        },
+        {
+          "name": "namedArrowFunction",
+          "line": 3,
+          "column": 5,
+          "file": "errorScript.js"
+        },
+        {
+          "line": 13,
+          "column": 5,
+          "file": "errorScript.js"
+        },
+        {
+          "name": "namedFunction",
+          "line": 14,
+          "column": 5,
+          "file": "errorScript.js"
+        },
+        {
+          "line": 18,
+          "column": 3,
+          "file": "errorScript.js"
+        }
+      ]
+    },
+    "v8": [
+      "Error: Example V8 Error",
+      "    at eval (eval at doubleEvalFunction (eval at namedArrowFunction (errorScript.js:3)), <anonymous>:1:7)",
+      "    at doubleEvalFunction (eval at namedArrowFunction (errorScript.js:3), <anonymous>:2:3)",
+      "    at eval (eval at namedArrowFunction (errorScript.js:3), <anonymous>:5:1)",
+      "    at namedArrowFunction (errorScript.js:3:5)",
+      "    at errorScript.js:13:5",
+      "    at namedFunction (errorScript.js:14:5)",
+      "    at errorScript.js:18:3"
+    ],
+    "spiderMonkey": [
+      "@http://127.0.0.1:5500/test/errorScript.js line 5 > eval line 2 > eval:1:7",
+      "doubleEvalFunction@http://127.0.0.1:5500/test/errorScript.js line 5 > eval:2:3",
+      "@http://127.0.0.1:5500/test/errorScript.js line 5 > eval:5:1",
+      "namedArrowFunction@http://127.0.0.1:5500/test/errorScript.js:5:5",
+      "namedFunction/<@http://127.0.0.1:5500/test/errorScript.js:15:5",
+      "namedFunction@http://127.0.0.1:5500/test/errorScript.js:14:3",
+      "@http://127.0.0.1:5500/test/errorScript.js:20:3"
+    ]
+  }
+}

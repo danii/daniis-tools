@@ -5,10 +5,14 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="X-UA-Compatible" content="ie=edge">
 
-        <script>
-            let module;
-            import("../out/esmodule-tools.js").then(mod => module = mod);
+        <script src="../out/esmodule-tools.js" type="module"></script>
+
+        <script type="module">
+            import * as module from "../out/esmodule-tools.js";
+            Object.entries(module).forEach(val => window[val[0]] = val[1]);
         </script>
+
+        <script src="errorScript.js"></script>
 
         <title>Document</title>
     </head>
