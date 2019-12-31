@@ -6,6 +6,9 @@
   "types": "dist/tools.d.ts",
   "author": "Daniel Conley",
   "license": "GPL-3.0",
+  "keywords": [
+    "tools", "types", "prototype", "extension", "methods", "utility", "util"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/Daniihh/daniis-typescript-utils.git"
