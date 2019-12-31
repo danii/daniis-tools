@@ -2,7 +2,7 @@ const [{src, dest}, fs, ts, rename, compress, merge, filter] =
   ["!gulp", "!fs", "typescript", "rename", "minify", "!merge-stream", "filter"]
     .map(i => i.startsWith("!") ? i.substr(1) : `gulp-${i}`).map(require);
 
-const requiredFolders = ["out"];
+const requiredFolders = ["dist"];
 
 function ensureFolders() {
   requiredFolders.forEach(dir => fs.existsSync(dir) ? null : fs.mkdirSync(dir));
@@ -21,6 +21,6 @@ module.exports = {
     let out = [src("./src/*.ts")];
     out = out.map(i => [applyTs(i, "esmodule"), applyTs(i, "commonjs")]).flat();
     out = out.map(i => [i, applyCompress(i, {"ext": {"min": "-min.js"}, "preserveComments": "some"})]).flat();
-    return merge(...out, dTsFilter.restore).pipe(dest("./out/"));
+    return merge(...out, dTsFilter.restore).pipe(dest("./dist/"));
   }
 }

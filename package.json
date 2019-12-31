@@ -1,23 +1,23 @@
 {
   "name": "daniis-tools",
   "version": "1.0.0",
-  "description": "Soon™ (Not a serious use of the TM emoji)",
-  "main": "out/commonjs-tools.js",
-  "types": "out/tools.d.ts",
-  "scripts": {
-    "test": "mocha",
-    "start": "gulp compile"
-  },
+  "description": "A set of functions, types, better typings and extra methods to improve your coding experience.",
+  "main": "dist/commonjs-tools.js",
+  "types": "dist/tools.d.ts",
+  "author": "Daniel Conley",
+  "license": "GPL-3.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Daniihh/daniis-typescript-utils.git"
+    "url": "https://github.com/Daniihh/daniis-typescript-utils.git"
   },
-  "author": "Daniihh",
-  "license": "ISC",
   "bugs": {
     "url": "https://github.com/Daniihh/daniis-typescript-utils/issues"
   },
   "homepage": "https://github.com/Daniihh/daniis-typescript-utils#readme",
+  "scripts": {
+    "test": "mocha",
+    "compile": "gulp compile"
+  },
   "dependencies": {},
   "devDependencies": {
     "@types/node": "^12.12.14",
