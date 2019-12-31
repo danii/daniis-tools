@@ -66,10 +66,8 @@ type PsuedoObject<T extends Primitive> =
 
 /**
  * A union of all JavaScript primitives.
- * 
- * Exclusion Reason: Exporting is not necessary at this point in time.
  */
-type Primitive = string | number | bigint | boolean | symbol;
+export type Primitive = string | number | bigint | boolean | symbol;
 
 /*
   Quick Definitions
@@ -347,7 +345,7 @@ declare global {
      * @param str String to interpolate with.
      * @param values The variables supplied.
      */
-    interpolate(values: Of<any>);
+    interpolate(values: Of<any>): string;
   }
 
   interface SymbolConstructor {
