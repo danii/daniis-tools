@@ -1,5 +1,5 @@
 const assert = require("assert");
-const tools = require("./../out/commonjs-tools");
+const tools = require("./../dist/commonjs-tools");
 
 /**
  * Typescript's tired and true __decorate function.
@@ -134,6 +134,25 @@ describe("String", function() {
 });
 
 describe("bound", function() {
+  it("should update the property descriptor passed or return a new property descriptor with a getter", function() {
+    let descriptor = {
+      "value": function() {
+        return this;
+      },
+      "writable": false
+    };
+
+    let object = {
+      "whatsThis": descriptor.value
+    };
+
+    descriptor = tools.bound(object, "whatsThis", descriptor) || descriptor;
+
+    assert.strictEqual(descriptor.writeable, undefined);
+    assert.strictEqual(descriptor.value, undefined);
+    assert.strictEqual(typeof descriptor.get, "function");
+  });
+
   it("should permanently bind the provided function to it's target", function() {
     let object = {
       func() {
