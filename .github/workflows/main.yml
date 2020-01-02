@@ -1,0 +1,15 @@
+# Tests new pull requests for any bugs.
+name: Mocha Testing
+on: pull_request
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # Bring in commits proposed in the pull request.
+    - uses: actions/checkout@v1
+      # Setup node environment with dependencies from package.json.
+    - name: Setup Node Modules
+      run: npm install
+      # Test the new commits and ensure they don't introduce any bugs.
+    - name: Run Tests With Mocha
+      run: ./node_modules/.bin/mocha
