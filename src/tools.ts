@@ -194,6 +194,18 @@ export type Constructor<T> =
   T extends Primitive ? {(...args: any[]): T} : {new(...args: any[]): T};
 
 /**
+ * An object for specifying how code should run.
+ */
+type EvaluateOptions = {
+  asynchronous?: boolean,
+  expression?: boolean,
+  arguments?: Of<any>,
+  thisArg?: any,
+  code: string
+  evaluater?: (code: Function) => any
+};
+
+/**
  * A stack frame object.
  * 
  * Exclusion Reason: Relies on AdvancedError. May also be
@@ -301,9 +313,9 @@ declare global {
     forEach<TH = any>(callback: Consumer<T, this, TH>, thisArg?: TH): void;
     map<R = void, TH = any>(callback: Mapper<T, R, this, TH>, thisArg?: TH): R[];
     reduce<R = T>(callback: Reducer<T, R, this>): T | R;
-    reduce<R = T, I = T>(callback: Reducer<T, R, this, I>, initial: I): R | I;
+    reduce<R = T, I = R>(callback: Reducer<T, R, this, I>, initial: I): R | I;
     reduceRight<R = T>(callback: Reducer<T, R, this>): T | R;
-    reduceRight<R = T, I = T>(callback: Reducer<T, R, this, I>, initial: I): R | T;
+    reduceRight<R = T, I = R>(callback: Reducer<T, R, this, I>, initial: I): R | T;
     some<TH = any>(callback: Mapper<T, boolean, this, TH>, thisArg?: TH): boolean;
   }
 
@@ -315,6 +327,9 @@ declare global {
   
     every<T, V, TH = any>(object: Of<V> & T, callback: Mapper<Entry<V>, boolean, T, TH>, thisArg?: TH): boolean;
     filter<T, V, TH = any>(object: Of<V> & T, callback: Mapper<Entry<V>, boolean, T, TH>, thisArg?: TH): Of<V>;
+    forEach<T, V, TH = any>(object: Of<V> & T, callback: Mapper<Entry<V>, void, T, TH>, thisArg?: TH): void;
+    reduce<T, V, R>(object: Of<V> & T, callback: Reducer<Entry<V>, R, T>): T | R;
+    reduce<T, V, R, I = R>(object: Of<V> & T, callback: Reducer<Entry<V>, R, T, I>, initial: I): R | I;
   
     getType(item: any): string;
     objectHasOwnProperty(object: any, property: Key): boolean;
@@ -435,6 +450,12 @@ defineProperties(Object, {
     return this.fromEntries(this.entries(object).filter((a, i) => callback.call(thisArg, a, i, object)));
   },
 
+  forEach<V, T, TH = any>(object: Of<V> & T,
+      callback: Mapper<Entry<V>, void, T, TH>, thisArg: TH): void {
+    return Object.entries(object)
+      .forEach((item, ind) => callback.call(thisArg, item, ind, object));
+  },
+
   getType(item: any) {
     if (item === null) return "null";
     if (typeof item != "object") return typeof item;
@@ -482,14 +503,21 @@ defineProperties(Symbol, {
 
 
 /*
+  CONSTANTS
+*/
+
+const evalVarsIllegal = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "let", "new", "null", "packagae", "private", "protected", "public", "return", "static", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "yield"];
+const evalVarsRegEx = /[\p{L}$_][\p{L}\d$_]*/gu;
+
+
+
+/*
   FFFFF U   U N   N  CCCC TTTTT IIIII  OOO  N   N  SSSS
   F     U   U NN  N C       T     I   O   O NN  N S    
   FFF   U   U N N N C       T     I   O   O N N N  SSS 
   F     U   U N  NN C       T     I   O   O N  NN     S
   F      UUU  N   N  CCCC   T   IIIII  OOO  N   N SSSS 
 */
-
-const keywords = ["arguments", "in", "of", "for", "if", "else", "throw", "while", "do", "with", "function", "let", "const", "var", "new", "return", "delete"];
 
 /**
  * Ensures that the mentioned method's this value will
@@ -546,49 +574,80 @@ function withSelf(proto, key, descriptor) {
  * @param code The code to be executed.
  * @param args The arguments to be used.
  */
-function evaluate(code: string, args: Of<any> = {}) {
-  let specialArgNames = ["this"];
-  let specialArgs: Of<any> = {};
-  args = Object.filter(args, ([key, value]) => {
-    if (specialArgNames.includes(key)) {
-      specialArgs[key] = value;
-      return false;
-    } else if (keywords.includes(key)) {
+export function evaluate(options: EvaluateOptions | string): any;
+export function evaluate(code: string, options: Omit<EvaluateOptions, "code">): any;
+export function evaluate(code: string, args: Of<any>, options: Omit<EvaluateOptions, "code" | "arguments">): any;
+export function evaluate(code: string | EvaluateOptions, args?: Of<any> |
+    Omit<EvaluateOptions, "code">, options?: Omit<EvaluateOptions,
+    "code" | "arguments">): Promise<any> {
+  const parsedOptions = !options ?
+    !args ?
+      typeof code == "string" ? {"code": code} : code :
+      {...args, "code": code as string} :
+    {...options, "arguments": args, "code": code as string};
+  Object.forEach(parsedOptions.arguments || {}, ([key, val]) => {
+    if (evalVarsIllegal.includes(key) || !evalVarsRegEx.test(key))
       throw new TypeError("Illegal argument name provided.");
-    } else return true;
   });
 
-  let argNames = args ? Object.keys(args) : [];
-  let argValues = args ? Object.values(args) : [];
-  let finalCode = `try{return eval("${code.escape()}")}catch(a){if(!(a ` +
-    'instanceof SyntaxError))throw a;let b=JSON.parse("' +
-    JSON.stringify(argNames).escape() + '");return new Function(...b,"' +
-    code.escape() + '")(...arguments)}';
-  let func = new Function(...argNames, finalCode);
-  return func.call(specialArgs.this ? specialArgs.this : this, ...argValues);
+  const argNames = Object.keys(parsedOptions.arguments || {});
+  const argValues = Object.values(parsedOptions.arguments || {});
+  //TODO: Uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+  const finalCode = new Function(...argNames,
+    `{const a=JSON.parse(\"${JSON.stringify(argNames).escape()}\"),b=JSON.parse(\"${JSON.stringify(parsedOptions.asynchronous == null ? null : parsedOptions.asynchronous).escape()}\"),c=JSON.parse(\"${JSON.stringify(parsedOptions.expression == null ? null : parsedOptions.expression).escape()}\"),d=Object.getPrototypeOf(async function(){}).constructor,e=JSON.parse(\"${JSON.stringify(parsedOptions.code).escape()}\"),f=()=>{if(!b)try{return new Function(...a,\`return(()=>\${e}).call(null,arguments)\`).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new Function(...a,\`return(async()=>\${e}).call(null,arguments)\`).call(this,...arguments);throw c}else return new Function(...a,\`return(async()=>\${e}).call(null,arguments)\`).call(this,...arguments)},g=()=>{if(!b)try{return new Function(...a,e).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new d(...a,e).call(this,...arguments);throw c}else return new d(...a,e).call(this,...arguments)};if(null==c)try{return f()}catch(a){if(a instanceof SyntaxError&&null==c)return g();throw a}else return c?f():g()}`)
+      .bind(parsedOptions.thisArg ? parsedOptions.thisArg : this, ...argValues);
+  return (parsedOptions.evaluater || (func => func()))(finalCode);
 }
 
-function findPairs(this: string | void, stringOrOperators: string | string[] |
-    Of<(depth: number) => number>, operatorsOrLocation?: number |
-    Of<(depth: number) => number>, locationOrDepth?: number,
-    depthArg?: number) {
-  const [string, operators, location, depth] =
-    stringOrOperators instanceof Array || typeof stringOrOperators == "string" ||
-    stringOrOperators instanceof String ? [
-      typeof stringOrOperators == "string" ?
-        stringOrOperators.split("") : stringOrOperators as string[],
-      operatorsOrLocation as Of<(depth: number) => number>,
-      locationOrDepth as number || 0,
-      depthArg == null ? -1 : depthArg as number
-    ] : [
-      (this as string).split(""),
-      stringOrOperators as Of<(depth: number) => number>,
-      operatorsOrLocation as number || 0,
-      locationOrDepth == null ? -1 : locationOrDepth as number
-    ];
-  if (depth == 0) return location;
-  if (string[location] == null) throw new Error();
-  const operation = operators[string[location]];
-  const newDepth = operation ? operation(depth == -1 ? 0 : depth) : depth;
-  return findPairs(string, operators, location + 1, newDepth);
-}
+/* RAW EVALUATE FUNCTION
+  const rawEval = function(argNames, something, nothing, namesHaveNoEffectOnCode, isExpression, code) {
+    {
+      const argNames = JSON.parse("FED");
+      const isAsync = JSON.parse("FED");
+      const isExpression = JSON.parse("FED");
+      const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
+      const code = JSON.parse("FED");
+      const asyncHandleExpression = () => {
+        if (!isAsync) {
+          try {
+            return new Function(...argNames, `return(()=>${code}).call(null,arguments)`).call(this, ...arguments);
+          } catch (ex) {
+            if (ex instanceof SyntaxError && isAsync == null)
+              return new Function(...argNames, `return(async()=>${code}).call(null,arguments)`).call(this, ...arguments);
+            throw ex;
+          }
+        } else {
+          return new Function(...argNames, `return(async()=>${code}).call(null,arguments)`).call(this, ...arguments);
+        }
+      };
+      const asyncHandleStatements = () => {
+        if (!isAsync) {
+          try {
+            return new Function(...argNames, code).call(this, ...arguments);
+          } catch (ex) {
+            if (ex instanceof SyntaxError && isAsync == null)
+              //@ts-ignore
+              return new AsyncFunction(...argNames, code).call(this, ...arguments);
+            throw ex;
+          }
+        } else {
+          //@ts-ignore
+          return new AsyncFunction(...argNames, code).call(this, ...arguments);
+        }
+      };
+      if (isExpression == null) {
+        try {
+          return asyncHandleExpression();
+        } catch (ex) {
+          if (ex instanceof SyntaxError && isExpression == null)
+            return asyncHandleStatements();
+          throw ex;
+        }
+      } else if (isExpression) {
+        return asyncHandleExpression();
+      } else {
+        return asyncHandleStatements();
+      }
+    }
+  }
+*/
