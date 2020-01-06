@@ -202,7 +202,7 @@ type EvaluateOptions = {
   arguments?: Of<any>,
   thisArg?: any,
   code: string
-  evaluater?: (code: Function) => any
+  evaluater?: (code: Function) => Promise<any>
 };
 
 /**
@@ -490,9 +490,12 @@ defineProperties(String.prototype, {
   },
 
   interpolate(this: string, values: Of<any>) {
-    let charArray = this.split("");
-    charArray = charArray.map(char => char == "`" ? "\`" : char == "\\" ? "\\\\" : char);
-    return evaluate("`" + charArray.join("") + "`", values);
+    const cleanedContent = this.split("")
+      .map(char => char == "`" ? "\`" : char == "\\" ? "\\\\" : char).join("");
+    const argNames = Object.keys(values);
+    const argValues = Object.values(values);
+    const func = new Function(...argNames, `return \`${cleanedContent}\`;`);
+    return func(...argValues);
   }
 } as Partial<String>);
 
@@ -506,6 +509,7 @@ defineProperties(Symbol, {
   CONSTANTS
 */
 
+const evalCode = "{const a=JSON.parse(\"\0\"),b=JSON.parse(\"\0\"),c=JSON.parse(\"\0\"),d=Object.getPrototypeOf(async function(){}).constructor,e=JSON.parse(\"\0\"),f=()=>{if(!b)try{return new Function(...a,`return(()=>${e}).call(null,arguments)`).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new Function(...a,`return(async()=>${e}).call(null,arguments)`).call(this,...arguments);throw c}else return new Function(...a,`return(()=>${e}).call(null,arguments)`).call(this,...arguments)},g=()=>{if(!b)try{return new Function(...a,e).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new d(...a,e).call(this,...arguments);throw c}else return new d(...a,e).call(this,...arguments)};if(null==c)try{return f()}catch(a){if(a instanceof SyntaxError&&null==c)return g();throw a}else return c?f():g()}";
 const evalVarsIllegal = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "let", "new", "null", "packagae", "private", "protected", "public", "return", "static", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "yield"];
 const evalVarsRegEx = /[\p{L}$_][\p{L}\d$_]*/gu;
 
@@ -574,29 +578,30 @@ function withSelf(proto, key, descriptor) {
  * @param code The code to be executed.
  * @param args The arguments to be used.
  */
-export function evaluate(options: EvaluateOptions | string): any;
-export function evaluate(code: string, options: Omit<EvaluateOptions, "code">): any;
-export function evaluate(code: string, args: Of<any>, options: Omit<EvaluateOptions, "code" | "arguments">): any;
-export function evaluate(code: string | EvaluateOptions, args?: Of<any> |
-    Omit<EvaluateOptions, "code">, options?: Omit<EvaluateOptions,
-    "code" | "arguments">): Promise<any> {
-  const parsedOptions = !options ?
-    !args ?
-      typeof code == "string" ? {"code": code} : code :
-      {...args, "code": code as string} :
-    {...options, "arguments": args, "code": code as string};
-  Object.forEach(parsedOptions.arguments || {}, ([key, val]) => {
+export async function evaluate(options: EvaluateOptions | string): Promise<any>;
+export async function evaluate(code: string, options: Omit<EvaluateOptions, "code">): Promise<any>;
+export async function evaluate(code: string, args: Of<any>, options: Omit<EvaluateOptions, "code" | "arguments">): Promise<any>;
+export async function evaluate(code: string | EvaluateOptions,
+    args?: Of<any> | Omit<EvaluateOptions, "code">, options?:
+    Omit<EvaluateOptions, "code" | "arguments">): Promise<any> {
+  let opts: EvaluateOptions;
+  if (!options) {
+    if (!args) opts = typeof code == "string" ? {"code": code} : code;
+    else opts = {...args, "code": code as string};
+  } else opts = {...options, "arguments": args, "code": code as string};
+  Object.forEach(opts.arguments || {}, ([key]) => {
     if (evalVarsIllegal.includes(key) || !evalVarsRegEx.test(key))
       throw new TypeError("Illegal argument name provided.");
   });
 
-  const argNames = Object.keys(parsedOptions.arguments || {});
-  const argValues = Object.values(parsedOptions.arguments || {});
-  //TODO: Uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-  const finalCode = new Function(...argNames,
-    `{const a=JSON.parse(\"${JSON.stringify(argNames).escape()}\"),b=JSON.parse(\"${JSON.stringify(parsedOptions.asynchronous == null ? null : parsedOptions.asynchronous).escape()}\"),c=JSON.parse(\"${JSON.stringify(parsedOptions.expression == null ? null : parsedOptions.expression).escape()}\"),d=Object.getPrototypeOf(async function(){}).constructor,e=JSON.parse(\"${JSON.stringify(parsedOptions.code).escape()}\"),f=()=>{if(!b)try{return new Function(...a,\`return(()=>\${e}).call(null,arguments)\`).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new Function(...a,\`return(async()=>\${e}).call(null,arguments)\`).call(this,...arguments);throw c}else return new Function(...a,\`return(async()=>\${e}).call(null,arguments)\`).call(this,...arguments)},g=()=>{if(!b)try{return new Function(...a,e).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new d(...a,e).call(this,...arguments);throw c}else return new d(...a,e).call(this,...arguments)};if(null==c)try{return f()}catch(a){if(a instanceof SyntaxError&&null==c)return g();throw a}else return c?f():g()}`)
-      .bind(parsedOptions.thisArg ? parsedOptions.thisArg : this, ...argValues);
-  return (parsedOptions.evaluater || (func => func()))(finalCode);
+  const argNames = Object.keys(opts.arguments || {});
+  const argValues = Object.values(opts.arguments || {});
+  const parts = [argNames, opts.asynchronous, opts.expression, opts.code]
+    .map(part => JSON.stringify(part == null ? null : part).escape());
+  const finalCode = new Function(...argNames, evalCode.split("\0")
+    .reduce((acc, val, ind) => acc + parts[ind - 1] + val))
+      .bind(opts.thisArg ? opts.thisArg : this, ...argValues);
+  return await (opts.evaluater || (func => func()))(finalCode);
 }
 
 /* RAW EVALUATE FUNCTION
