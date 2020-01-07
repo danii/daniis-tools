@@ -328,8 +328,10 @@ declare global {
     every<T, V, TH = any>(object: Of<V> & T, callback: Mapper<Entry<V>, boolean, T, TH>, thisArg?: TH): boolean;
     filter<T, V, TH = any>(object: Of<V> & T, callback: Mapper<Entry<V>, boolean, T, TH>, thisArg?: TH): Of<V>;
     forEach<T, V, TH = any>(object: Of<V> & T, callback: Mapper<Entry<V>, void, T, TH>, thisArg?: TH): void;
+    map<T, V, R = void, TH = any>(object: Of<V> & T, callback: Mapper<Entry<V>, boolean, T, TH>, thisArg?: TH): Of<R>;
     reduce<T, V, R>(object: Of<V> & T, callback: Reducer<Entry<V>, R, T>): T | R;
     reduce<T, V, R, I = R>(object: Of<V> & T, callback: Reducer<Entry<V>, R, T, I>, initial: I): R | I;
+    some<T, V, TH = any>(object: Of<V> & T, callback: Mapper<Entry<V>, boolean, T, TH>, thisArg?: TH): boolean;
   
     getType(item: any): string;
     objectHasOwnProperty(object: any, property: Key): boolean;
@@ -442,18 +444,40 @@ defineProperties(Object, {
     return Object.assign(new Construct(), item);
   },
 
-  every<Type, Values, This = any>(this: ObjectConstructor, object: Of<Values> & Type, callback: Mapper<Entry<Values>, boolean, Type, This>, thisArg?: This): boolean {
-    return this.entries(object).every((a, i) => callback.call(thisArg, a, i, object));
+  every<T, V, TH = any>(object: Of<V> & T,
+      callback: Mapper<Entry<V>, boolean, T, TH>, thisArg?: TH): boolean {
+    return Object.entries(object)
+      .every((item, ind) => callback.call(thisArg, item, ind, object));
   },
 
-  filter<Type, Values, This = any>(this: ObjectConstructor, object: Of<Values> & Type, callback: Mapper<Entry<Values>, boolean, Type, This>, thisArg?: This): Of<Values> {
-    return this.fromEntries(this.entries(object).filter((a, i) => callback.call(thisArg, a, i, object)));
+  filter<T, V, TH = any>(object: Of<V> & T,
+      callback: Mapper<Entry<V>, boolean, T, TH>, thisArg?: TH): Of<V> {
+    return Object.fromEntries(Object.entries(object)
+      .filter((item, ind) => callback.call(thisArg, item, ind, object)));
   },
 
-  forEach<V, T, TH = any>(object: Of<V> & T,
+  forEach<T, V, TH = any>(object: Of<V> & T,
       callback: Mapper<Entry<V>, void, T, TH>, thisArg: TH): void {
     return Object.entries(object)
       .forEach((item, ind) => callback.call(thisArg, item, ind, object));
+  },
+
+  map<T, V, R = void, TH = any>(object: Of<V> & T,
+      callback: Mapper<Entry<V>, R, T, TH>, thisArg: TH) {
+    return Object.fromEntries(Object.entries(object)
+      .map((item, ind) => callback.call(thisArg, item, ind, object)));
+  },
+
+  reduce<T, V, R, I>(object: Of<V> & T, callback: Reducer<Entry<V>, R, T, I>,
+      initial?: I) {
+    return Object.entries(object).reduce<R, I>((acc, item, ind) =>
+      callback(acc, item, ind, object), initial);
+  },
+
+  some<T, V, TH = any>(object: Of<V> & T,
+      callback: Mapper<Entry<V>, boolean, T, TH>, thisArg?: TH) {
+    return Object.entries(object)
+      .some((item, ind) => callback.call(thisArg, item, ind, object));
   },
 
   getType(item: any) {
@@ -506,7 +530,11 @@ defineProperties(Symbol, {
 
 
 /*
-  CONSTANTS
+   CCCC  OOO  N   N  SSSS TTTTT  AAA  N   N TTTTT  SSSS
+  C     O   O NN  N S       T   A   A NN  N   T   S    
+  C     O   O N N N  SSS    T   AAAAA N N N   T    SSS 
+  C     O   O N  NN     S   T   A   A N  NN   T       S
+   CCCC  OOO  N   N SSSS    T   A   A N   N   T   SSSS
 */
 
 const evalCode = "{const a=JSON.parse(\"\0\"),b=JSON.parse(\"\0\"),c=JSON.parse(\"\0\"),d=Object.getPrototypeOf(async function(){}).constructor,e=JSON.parse(\"\0\"),f=()=>{if(!b)try{return new Function(...a,`return(()=>${e}).call(null,arguments)`).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new Function(...a,`return(async()=>${e}).call(null,arguments)`).call(this,...arguments);throw c}else return new Function(...a,`return(()=>${e}).call(null,arguments)`).call(this,...arguments)},g=()=>{if(!b)try{return new Function(...a,e).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new d(...a,e).call(this,...arguments);throw c}else return new d(...a,e).call(this,...arguments)};if(null==c)try{return f()}catch(a){if(a instanceof SyntaxError&&null==c)return g();throw a}else return c?f():g()}";
