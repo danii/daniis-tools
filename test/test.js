@@ -262,7 +262,7 @@ describe("evaluate", function() {
       assertPromiseStrictEqual(tools.evaluate("num + 1", {"num": 6}), 7),
       assertPromiseStrictEqual(tools.evaluate("a + b", {"a": 1, "b": 10}), 11),
       assertPromiseStrictEqual(tools.evaluate("passThrough", {"passThrough": object}), object),
-      assertPromiseReject(tools.evaluate("undefined", {"50notValid": 420, "this": 69}), Error)
+      assertPromiseReject(tools.evaluate("undefined", {"50notValid": 420, "this": 69}), TypeError)
     ];
 
     return Promise.all(promises);
@@ -272,7 +272,7 @@ describe("evaluate", function() {
     const promises = [
       assertPromiseStrictEqual(tools.evaluate('"direct"'), "direct"),
       assertPromiseStrictEqual(tools.evaluate("`seperate ${arg}`", {"arg": "arguments"}), "seperate arguments"),
-      assertPromiseStrictEqual(tools.evaluate("String(arg)", {"args": "seperate options"}, {"asynchronous": true}).then(prom => prom), "seperate options"),
+      assertPromiseStrictEqual(tools.evaluate("String(arg)", {"arg": "seperate options"}, {"asynchronous": true}).then(prom => prom), "seperate options"),
       assertPromiseStrictEqual(tools.evaluate({"code": 'value + " " + value2', "arguments": {"value": "one", "value2": "options object"}}), "one options object")
     ];
     

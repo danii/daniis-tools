@@ -539,7 +539,7 @@ defineProperties(Symbol, {
 
 const evalCode = "{const a=JSON.parse(\"\0\"),b=JSON.parse(\"\0\"),c=JSON.parse(\"\0\"),d=Object.getPrototypeOf(async function(){}).constructor,e=JSON.parse(\"\0\"),f=()=>{if(!b)try{return new Function(...a,`return(()=>${e}).call(null,arguments)`).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new Function(...a,`return(async()=>${e}).call(null,arguments)`).call(this,...arguments);throw c}else return new Function(...a,`return(()=>${e}).call(null,arguments)`).call(this,...arguments)},g=()=>{if(!b)try{return new Function(...a,e).call(this,...arguments)}catch(c){if(c instanceof SyntaxError&&null==b)return new d(...a,e).call(this,...arguments);throw c}else return new d(...a,e).call(this,...arguments)};if(null==c)try{return f()}catch(a){if(a instanceof SyntaxError&&null==c)return g();throw a}else return c?f():g()}";
 const evalVarsIllegal = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "let", "new", "null", "packagae", "private", "protected", "public", "return", "static", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "yield"];
-const evalVarsRegEx = /[\p{L}$_][\p{L}\d$_]*/gu;
+const evalVarsRegEx = /[\p{L}$_][\p{L}\d$_]*/u;
 
 
 
@@ -615,7 +615,7 @@ export async function evaluate(code: string | EvaluateOptions,
   let opts: EvaluateOptions;
   if (!options) {
     if (!args) opts = typeof code == "string" ? {"code": code} : code;
-    else opts = {...args, "code": code as string};
+    else opts = {"code": code as string, "arguments": args};
   } else opts = {...options, "arguments": args, "code": code as string};
   Object.forEach(opts.arguments || {}, ([key]) => {
     if (evalVarsIllegal.includes(key) || !evalVarsRegEx.test(key))
