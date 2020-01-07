@@ -1,6 +1,6 @@
 const assert = require("assert");
 const util = require("util");
-const tools = require("./../out/commonjs-tools");
+const tools = require("./../dist/commonjs-tools");
 const data = require("./testData.json");
 
 /**
@@ -12,6 +12,23 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
   else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
   return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+
+async function assertPromiseReject(promise, error) {
+  class PromiseCompleted extends Error {};
+  try {
+    await promise;
+    throw new PromiseCompleted();
+  } catch (err) {
+    if (err instanceof PromiseCompleted)
+      throw new Error("Promise was completed, but it was expected to be rejected.");
+    if (!(err instanceof error))
+      throw new Error(`Promise rejected with a ${Object.getPrototypeOf(err).constructor.name}, but it was expected to be rejected with a ${error.name}.`);
+  }
+}
+
+async function assertPromiseStrictEqual(promise, result) {
+  assert.strictEqual(await promise, result);
+}
 
 function assertSimilar(inputA, inputB, noThrow) {
   if (typeof inputA != "object") {
@@ -51,7 +68,8 @@ function assertSimilar(inputA, inputB, noThrow) {
 
 function assertSimilarButNotSame(inputA, inputB) {
   assertSimilar(inputA, inputB);
-  assert(inputA != inputB);
+  if (typeof inputA == "object")
+    assert(inputA != inputB);
 }
 
 describe("Array", function() {
@@ -123,7 +141,67 @@ describe("Object", function() {
     });
   });
 
-  //TODO: Make tests for every, & filter, and finish that line of functions.
+  describe(".every()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa"}};
+      const check1 = ([key, value]) => "name" in value && value.name.toLowerCase() == key;
+      assert.strictEqual(Object.every(object1, check1), Object.entries(object1).every(check1));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = ([key, value]) => !value;
+      assert.strictEqual(Object.every(object2, check2), Object.entries(object2).every(check2));
+    });
+  });
+
+  describe(".filter()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa"}, "_meta": {"people": 2}};
+      const check1 = ([key]) => key != "_meta";
+      assertSimilarButNotSame(Object.filter(object1, check1), Object.fromEntries(Object.entries(object1).filter(check1)));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = ([key, value]) => !value;
+      assertSimilarButNotSame(Object.filter(object2, check2), Object.fromEntries(Object.entries(object2).filter(check2)));
+    });
+  });
+
+  //TODO: forEach tests.
+
+  describe(".map()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa", "employed": true}};
+      const check1 = ([key, value]) => [key, value.employed || false];
+      assertSimilarButNotSame(Object.map(object1, check1), Object.fromEntries(Object.entries(object1).map(check1)));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = ([key, value]) => [key, !value];
+      assertSimilarButNotSame(Object.map(object2, check2), Object.fromEntries(Object.entries(object2).map(check2)));
+    });
+  });
+
+  describe(".reduce()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa"}};
+      const check1 = (acc, [key, value]) => (acc.push(value.name), acc);
+      assertSimilarButNotSame(Object.reduce(object1, check1, []), Object.entries(object1).reduce(check1, []));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = (acc, [key, value]) => value ? acc + 1 : acc;
+      assertSimilarButNotSame(Object.reduce(object2, check2, 0), Object.entries(object2).reduce(check2, 0));
+    });
+  });
+
+  describe(".some()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa"}, "_meta": {"people": 2}};
+      const check1 = ([key, value]) => !("name" in value);
+      assert.strictEqual(Object.every(object1, check1), Object.entries(object1).every(check1));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = item => !item;
+      assert.strictEqual(Object.some(object2, check2), Object.entries(object2).some(check2));
+    });
+  });
 
   describe(".getType()", function() {
     it('should return the input\'s typeof value if it is not typeof "object"', function() {
@@ -170,6 +248,25 @@ describe("String", function() {
 });
 
 describe("bound", function() {
+  it("should update the property descriptor passed or return a new property descriptor with a getter", function() {
+    let descriptor = {
+      "value": function() {
+        return this;
+      },
+      "writable": false
+    };
+
+    let object = {
+      "whatsThis": descriptor.value
+    };
+
+    descriptor = tools.bound(object, "whatsThis", descriptor) || descriptor;
+
+    assert.strictEqual(descriptor.writeable, undefined);
+    assert.strictEqual(descriptor.value, undefined);
+    assert.strictEqual(typeof descriptor.get, "function");
+  });
+
   it("should permanently bind the provided function to it's target", function() {
     let object = {
       func() {
@@ -180,6 +277,42 @@ describe("bound", function() {
     __decorate([tools.bound], object, "func", null);
 
     assert.strictEqual(object.func.call({}), object);
+  });
+});
+
+describe("evaluate", function() {
+  it("should evaluate any valid javascript code passed to it", function() {
+    const promises = [
+      assertPromiseStrictEqual(tools.evaluate('"value to be returned"'), "value to be returned"),
+      assertPromiseStrictEqual(tools.evaluate('const item = 19; "not an expression!"'), undefined),
+      assertPromiseStrictEqual(tools.evaluate('const data = 42; return "this should return though"'), "this should return though"),
+      assertPromiseReject(tools.evaluate('def func:\n\tprint("not js code!")'), SyntaxError)
+    ];
+
+    return Promise.all(promises);
+  });
+
+  it("should support passing values to the code as arguments", function() {
+    const object = {};
+    const promises = [
+      assertPromiseStrictEqual(tools.evaluate("num + 1", {"num": 6}), 7),
+      assertPromiseStrictEqual(tools.evaluate("a + b", {"a": 1, "b": 10}), 11),
+      assertPromiseStrictEqual(tools.evaluate("passThrough", {"passThrough": object}), object),
+      assertPromiseReject(tools.evaluate("undefined", {"50notValid": 420, "this": 69}), TypeError)
+    ];
+
+    return Promise.all(promises);
+  });
+
+  it("should have versitile argument arrangements", function() {
+    const promises = [
+      assertPromiseStrictEqual(tools.evaluate('"direct"'), "direct"),
+      assertPromiseStrictEqual(tools.evaluate("`seperate ${arg}`", {"arg": "arguments"}), "seperate arguments"),
+      assertPromiseStrictEqual(tools.evaluate("String(arg)", {"arg": "seperate options"}, {"asynchronous": true}).then(prom => prom), "seperate options"),
+      assertPromiseStrictEqual(tools.evaluate({"code": 'value + " " + value2', "arguments": {"value": "one", "value2": "options object"}}), "one options object")
+    ];
+    
+    return Promise.all(promises);
   });
 });
 
