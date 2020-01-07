@@ -32,7 +32,8 @@ function assertSimilarButNotSame(inputA, inputB) {
   assert(Object.entries(inputA).every(entryA =>
     Object.entries(inputB).find(entryB =>
       entryA[0] == entryB[0] && entryA[1] == entryB[1])));
-  assert(inputA != inputB);
+  if (typeof inputA == "object")
+    assert(inputA != inputB);
 }
 
 describe("Array", function() {
@@ -104,7 +105,67 @@ describe("Object", function() {
     });
   });
 
-  //TODO: Object manipulation methods soonTM. (Not serious use of TM.)
+  describe(".every()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa"}};
+      const check1 = ([key, value]) => "name" in value && value.name.toLowerCase() == key;
+      assert.strictEqual(Object.every(object1, check1), Object.entries(object1).every(check1));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = ([key, value]) => !value;
+      assert.strictEqual(Object.every(object2, check2), Object.entries(object2).every(check2));
+    });
+  });
+
+  describe(".filter()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa"}, "_meta": {"people": 2}};
+      const check1 = ([key]) => key != "_meta";
+      assertSimilarButNotSame(Object.filter(object1, check1), Object.fromEntries(Object.entries(object1).filter(check1)));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = ([key, value]) => !value;
+      assertSimilarButNotSame(Object.filter(object2, check2), Object.fromEntries(Object.entries(object2).filter(check2)));
+    });
+  });
+
+  //TODO: forEach tests.
+
+  describe(".map()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa", "employed": true}};
+      const check1 = ([key, value]) => [key, value.employed || false];
+      assertSimilarButNotSame(Object.map(object1, check1), Object.fromEntries(Object.entries(object1).map(check1)));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = ([key, value]) => [key, !value];
+      assertSimilarButNotSame(Object.map(object2, check2), Object.fromEntries(Object.entries(object2).map(check2)));
+    });
+  });
+
+  describe(".reduce()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa"}};
+      const check1 = (acc, [key, value]) => (acc.push(value.name), acc);
+      assertSimilarButNotSame(Object.reduce(object1, check1, []), Object.entries(object1).reduce(check1, []));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = (acc, [key, value]) => value ? acc + 1 : acc;
+      assertSimilarButNotSame(Object.reduce(object2, check2, 0), Object.entries(object2).reduce(check2, 0));
+    });
+  });
+
+  describe(".some()", function() {
+    it("should work exactly like Array#every upon the provided object's entries", function() {
+      const object1 = {"bob": {"name": "Bob"}, "lisa": {"name": "Lisa"}, "_meta": {"people": 2}};
+      const check1 = ([key, value]) => !("name" in value);
+      assert.strictEqual(Object.every(object1, check1), Object.entries(object1).every(check1));
+    
+      const object2 = {"item1": false, "item2": false, "item3": true};
+      const check2 = item => !item;
+      assert.strictEqual(Object.some(object2, check2), Object.entries(object2).some(check2));
+    });
+  });
 
   describe(".getType()", function() {
     it('should return the input\'s typeof value if it is not typeof "object"', function() {
