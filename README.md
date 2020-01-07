@@ -7,12 +7,12 @@ Usage
 Simply import the file that corresponds to your environments module manager and enjoy extended prototypes and types in TypeScript.
 
 ```TypeScript
-import "./tools";
+import "daniis-tools";
 
 let numberNames: Of<number> = {"one": 1, "two": 2, "three": 3};
 ```
 ```JavaScript
-require("./tools");
+require("daniis-tools");
 
 let strings = {
   "en": "You have ${count} new messages.",

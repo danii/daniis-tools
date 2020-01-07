@@ -1,3 +1,4 @@
 # Ignore development files.
 test/
+.github/
 gulpfile.js
