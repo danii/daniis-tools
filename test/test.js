@@ -11,6 +11,23 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
   return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 
+async function assertPromiseReject(promise, error) {
+  class PromiseCompleted extends Error {};
+  try {
+    await promise;
+    throw new PromiseCompleted();
+  } catch (err) {
+    if (err instanceof PromiseCompleted)
+      throw new Error("Promise was completed, but it was expected to be rejected.");
+    if (!(err instanceof error))
+      throw new Error(`Promise rejected with a ${Object.getPrototypeOf(err).constructor.name}, but it was expected to be rejected with a ${error.name}.`);
+  }
+}
+
+async function assertPromiseStrictEqual(promise, result) {
+  assert.strictEqual(await promise, result);
+}
+
 function assertSimilarButNotSame(inputA, inputB) {
   assert(Object.entries(inputA).every(entryA =>
     Object.entries(inputB).find(entryB =>
@@ -87,7 +104,7 @@ describe("Object", function() {
     });
   });
 
-  //TODO: Make tests for every, & filter, and finish that line of functions.
+  //TODO: Object manipulation methods soonTM. (Not serious use of TM.)
 
   describe(".getType()", function() {
     it('should return the input\'s typeof value if it is not typeof "object"', function() {
@@ -163,5 +180,41 @@ describe("bound", function() {
     __decorate([tools.bound], object, "func", null);
 
     assert.strictEqual(object.func.call({}), object);
+  });
+});
+
+describe("evaluate", function() {
+  it("should evaluate any valid javascript code passed to it", function() {
+    const promises = [
+      assertPromiseStrictEqual(tools.evaluate('"value to be returned"'), "value to be returned"),
+      assertPromiseStrictEqual(tools.evaluate('const item = 19; "not an expression!"'), undefined),
+      assertPromiseStrictEqual(tools.evaluate('const data = 42; return "this should return though"'), "this should return though"),
+      assertPromiseReject(tools.evaluate('def func:\n\tprint("not js code!")'), SyntaxError)
+    ];
+
+    return Promise.all(promises);
+  });
+
+  it("should support passing values to the code as arguments", function() {
+    const object = {};
+    const promises = [
+      assertPromiseStrictEqual(tools.evaluate("num + 1", {"num": 6}), 7),
+      assertPromiseStrictEqual(tools.evaluate("a + b", {"a": 1, "b": 10}), 11),
+      assertPromiseStrictEqual(tools.evaluate("passThrough", {"passThrough": object}), object),
+      assertPromiseReject(tools.evaluate("undefined", {"50notValid": 420, "this": 69}), Error)
+    ];
+
+    return Promise.all(promises);
+  });
+
+  it("should have versitile argument arrangements", function() {
+    const promises = [
+      assertPromiseStrictEqual(tools.evaluate('"direct"'), "direct"),
+      assertPromiseStrictEqual(tools.evaluate("`seperate ${arg}`", {"arg": "arguments"}), "seperate arguments"),
+      assertPromiseStrictEqual(tools.evaluate("String(arg)", {"args": "seperate options"}, {"asynchronous": true}).then(prom => prom), "seperate options"),
+      assertPromiseStrictEqual(tools.evaluate({"code": 'value + " " + value2', "arguments": {"value": "one", "value2": "options object"}}), "one options object")
+    ];
+    
+    return Promise.all(promises);
   });
 });
