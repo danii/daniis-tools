@@ -10,6 +10,9 @@ jobs:
       # Setup node environment with dependencies from package.json.
     - name: Setup Node Modules
       run: npm install
+      # Build the project.
+    - name: Build Project
+      run: ./node_modules/.bin/gulp compile
       # Test the new commits and ensure they don't introduce any bugs.
     - name: Run Tests With Mocha
       run: ./node_modules/.bin/mocha
