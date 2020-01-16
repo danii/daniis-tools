@@ -1,6 +1,6 @@
 {
   "name": "daniis-tools",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A set of functions, types, better typings and extra methods to improve your coding experience.",
   "main": "dist/commonjs-tools.js",
   "types": "dist/tools.d.ts",
