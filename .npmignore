@@ -1,4 +1,5 @@
 # Ignore development files.
-test/
 .github/
+test/
+.gitattributes
 gulpfile.js

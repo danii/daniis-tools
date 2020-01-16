@@ -4,7 +4,6 @@ import minify from "gulp-minify";
 import rename from "gulp-rename";
 import filter from "gulp-filter";
 import merge from "merge-stream";
-import { promisify } from "util";
 
 const {src, dest} = Gulp;
 const moduleGoals = new Map([["esmodule", "ESNext"], ["commonjs", "CommonJS"]]);

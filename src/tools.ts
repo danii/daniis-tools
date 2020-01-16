@@ -150,6 +150,7 @@ export type Mapper<V, R, F = V[], T = any> =
  * @template I The initial value type. Defaults to `V`.
  * @template T The type of object this function is ran on.
  */
+//TODO: Switch F and I type order in 2.0 release.
 export type Reducer<V, R, F = V[], I = V, T = any> =
   (this: T, accumulator: R | I, current: V, index?: number, object?: F) => R;
 
